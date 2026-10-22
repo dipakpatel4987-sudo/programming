@@ -1,0 +1,31 @@
+Practical Example 4: Create a Django project and understand its directory structure
+
+
+Python program (uses the subprocess module to run Django's command):
+
+
+# create_project.py
+import os
+import subprocess
+import sys
+
+project = 'doctorfinder'
+subprocess.run([sys.executable, '-m', 'django', 'startproject', project], check=True)
+
+print('Project created. Directory structure:')
+for root, dirs, files in os.walk(project):
+    level = root.replace(project, '').count(os.sep)
+    print('    ' * level + os.path.basename(root) + '/')
+    for f in files:
+        print('    ' * (level + 1) + f)
+
+Output structure and the role of each file:
+
+doctorfinder/            <- project root folder
+    manage.py            <- command-line utility (runserver, migrate, startapp ...)
+    doctorfinder/        <- project configuration package
+        __init__.py      <- marks the folder as a Python package
+        settings.py      <- all settings (apps, database, templates, static files)
+        urls.py          <- root URL routing
+        wsgi.py          <- entry point for WSGI web servers (deployment)
+        asgi.py          <- entry point for ASGI servers (async)

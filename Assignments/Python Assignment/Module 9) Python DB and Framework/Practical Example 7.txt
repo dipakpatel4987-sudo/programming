@@ -1,0 +1,67 @@
+Practical Example 7: MVT (models, views, templates) to display doctor information
+
+Model (doctor/models.py):
+
+from django.db import models
+
+class Doctor(models.Model):
+    SPECIALTIES = [
+        ('Cardiology', 'Cardiology'), ('Dermatology', 'Dermatology'),
+        ('Neurology', 'Neurology'), ('Pediatrics', 'Pediatrics'),
+        ('Orthopedics', 'Orthopedics'), ('General', 'General Physician'),
+    ]
+    name = models.CharField(max_length=100)
+    specialty = models.CharField(max_length=50, choices=SPECIALTIES)
+    city = models.CharField(max_length=50)
+    phone = models.CharField(max_length=15)
+    email = models.EmailField(unique=True)
+    fee = models.DecimalField(max_digits=8, decimal_places=2, default=500)
+    bio = models.TextField(blank=True)
+    available = models.BooleanField(default=True)
+    latitude = models.FloatField(null=True, blank=True)     # used by Google Maps (PE 20)
+    longitude = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Dr. {self.name} ({self.specialty})'
+
+python manage.py makemigrations
+python manage.py migrate
+
+View (doctor/views.py):
+
+from .models import Doctor
+
+def doctor_list(request):
+    doctors = Doctor.objects.all().order_by('name')
+    return render(request, 'doctor/doctor_list.html', {'doctors': doctors})
+
+URL (doctor/urls.py, add): path('doctors/', views.doctor_list, name='doctors'),
+
+Template (doctor/templates/doctor/doctor_list.html):
+<!DOCTYPE html>
+<html>
+<head><title>Doctors</title></head>
+<body>
+    <h1>Our Doctors</h1>
+    <table border="1" cellpadding="6">
+        <tr><th>Name</th><th>Specialty</th><th>City</th><th>Fee</th><th>Status</th></tr>
+        {% for d in doctors %}
+        <tr>
+            <td>{{ d.name }}</td>
+            <td>{{ d.specialty }}</td>
+            <td>{{ d.city }}</td>
+            <td>{{ d.fee }}</td>
+            <td>{% if d.available %}Available{% else %}Busy{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">No doctors found.</td></tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
+Add sample data with the shell:
+
+python manage.py shell
+>>> from doctor.models import Doctor
+>>> Doctor.objects.create(name='Asha Shah', specialty='Cardiology', city='Ahmedabad', phone='9876543210', email='asha@mail.com', fee=600, latitude=23.0225, longitude=72.5714)

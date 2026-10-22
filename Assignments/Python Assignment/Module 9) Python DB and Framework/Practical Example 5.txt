@@ -1,0 +1,22 @@
+Practical Example 5: Create and activate a virtual environment, then install Django
+
+# setup_env.py
+import os
+import subprocess
+import venv
+
+env_dir = 'env'
+venv.create(env_dir, with_pip=True)            # create the virtual environment
+print('Virtual environment created in', env_dir)
+
+bin_dir = 'Scripts' if os.name == 'nt' else 'bin'
+pip = os.path.join(env_dir, bin_dir, 'pip')
+subprocess.run([pip, 'install', 'django'], check=True)     # install Django inside it
+subprocess.run([pip, 'freeze'], check=True)                 # show installed packages
+
+A script cannot activate the environment for your shell, so activate it with a command:
+
+env\Scripts\activate          # Windows
+source env/bin/activate       # Linux / macOS
+python -m django --version    # confirms Django is installed
+deactivate                    # leave the environment

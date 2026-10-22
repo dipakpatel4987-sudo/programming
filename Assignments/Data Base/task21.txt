@@ -1,0 +1,36 @@
+
+Setting environment for using XAMPP for Windows.
+Dipak@DIPAK c:\xampp
+# mysql -u root -p
+Enter password:
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+Your MariaDB connection id is 281
+Server version: 10.4.32-MariaDB mariadb.org binary distribution
+
+Copyright (c) 2000, 2018, Oracle, MariaDB Corporation Ab and others.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+MariaDB [(none)]> USE  library_db;
+Database changed
+MariaDB [library_db]> START TRANSACTION;
+Query OK, 0 rows affected (0.000 sec)
+
+
+MariaDB [library_db]> INSERT INTO books (book_id, title, author, price, year_of_publication)
+    -> VALUES
+    -> (101, 'Python Basics', 'John Smith', 55.00, 2022),
+    -> (102, 'SQL Essentials', 'Alice Brown', 65.00, 2021);
+Query OK, 2 rows affected (0.005 sec)
+Records: 2  Duplicates: 0  Warnings: 0
+
+
+MariaDB [library_db]> START TRANSACTION;
+MariaDB [library_db]> INSERT INTO books (book_id, title, author, price, year_of_publication)
+    -> VALUES
+    -> (103, 'Data Structures', 'David Lee', 75.00, 2023);
+Query OK, 1 row affected (0.005 sec)
+
+
+MariaDB [library_db]> ROLLBACK;
+Query OK, 0 rows affected (0.008 sec)

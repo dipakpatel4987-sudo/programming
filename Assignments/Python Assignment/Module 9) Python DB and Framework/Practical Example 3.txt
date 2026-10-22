@@ -1,0 +1,63 @@
+Practical Example 3: JavaScript validation of a patient registration form
+
+Files: views.py, urls.py, doctor/templates/doctor/register_patient.html
+
+# doctor/views.py  (add)
+def register_patient(request):
+    message = ''
+    if request.method == 'POST':
+        message = 'Registration successful for ' + request.POST.get('name', '')
+    return render(request, 'doctor/register_patient.html', {'message': message})
+
+# doctor/urls.py  (add)
+    path('register-patient/', views.register_patient, name='register-patient'),
+
+<!-- doctor/templates/doctor/register_patient.html -->
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Patient Registration</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>.err { color: red; font-size: 13px; } input { width: 95%; padding: 6px; margin: 4px 0; }</style>
+</head>
+<body>
+<div class="card">
+    <h2>Patient Registration</h2>
+    {% if message %}<p style="color:green">{{ message }}</p>{% endif %}
+    <form id="regForm" method="post">
+        {% csrf_token %}
+        <input type="text" name="name" id="name" placeholder="Full name">
+        <div class="err" id="nameErr"></div>
+        <input type="text" name="email" id="email" placeholder="Email">
+        <div class="err" id="emailErr"></div>
+        <input type="text" name="phone" id="phone" placeholder="10-digit phone">
+        <div class="err" id="phoneErr"></div>
+        <input type="number" name="age" id="age" placeholder="Age">
+        <div class="err" id="ageErr"></div>
+        <input type="password" name="password" id="password" placeholder="Password (min 6)">
+        <div class="err" id="passErr"></div>
+        <input type="password" id="confirm" placeholder="Confirm password">
+        <div class="err" id="confirmErr"></div>
+        <button type="submit" class="btn">Register</button>
+    </form>
+</div>
+
+<script>
+document.getElementById('regForm').addEventListener('submit', function (e) {
+    let valid = true;
+    const v = id => document.getElementById(id).value.trim();
+    const show = (id, msg) => { document.getElementById(id).textContent = msg; if (msg) valid = false; };
+
+    show('nameErr',  v('name').length < 3 ? 'Name must be at least 3 characters' : '');
+    show('emailErr', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v('email')) ? '' : 'Enter a valid email');
+    show('phoneErr', /^\d{10}$/.test(v('phone')) ? '' : 'Phone must be exactly 10 digits');
+    show('ageErr',   (v('age') >= 1 && v('age') <= 120) ? '' : 'Age must be between 1 and 120');
+    show('passErr',  v('password').length < 6 ? 'Password must be at least 6 characters' : '');
+    show('confirmErr', v('password') !== v('confirm') ? 'Passwords do not match' : '');
+
+    if (!valid) e.preventDefault();      // stop submission when any check fails
+});
+</script>
+</body>
+</html>

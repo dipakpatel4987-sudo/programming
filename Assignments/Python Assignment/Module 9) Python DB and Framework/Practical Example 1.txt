@@ -1,0 +1,34 @@
+//Practical Example 1: Render an HTML file ("Welcome to Doctor Finder")//
+
+Files: doctor/views.py, doctor/urls.py, doctorfinder/urls.py, doctor/templates/doctor/home.html
+# doctor/views.py
+from django.shortcuts import render
+
+def home(request):
+    return render(request, 'doctor/home.html')
+# doctor/urls.py  (create this file)
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.home, name='home'),
+]
+# doctorfinder/urls.py
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('doctor.urls')),
+]
+<!-- doctor/templates/doctor/home.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Doctor Finder</title>
+</head>
+<body>
+    <h1>Welcome to Doctor Finder</h1>
+</body>
+</html>
+Run python manage.py runserver and open http://127.0.0.1:8000/.

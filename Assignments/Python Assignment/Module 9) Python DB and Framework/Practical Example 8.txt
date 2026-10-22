@@ -1,0 +1,27 @@
+Practical Example 8: Admin panel with custom fields for doctor information
+
+python manage.py createsuperuser
+# doctor/admin.py
+
+from django.contrib import admin
+from .models import Doctor
+
+@admin.register(Doctor)
+class DoctorAdmin(admin.ModelAdmin):
+    list_display = ('name', 'specialty', 'city', 'phone', 'fee', 'available')
+    list_filter = ('specialty', 'city', 'available')
+    search_fields = ('name', 'email', 'phone')
+    list_editable = ('available',)
+    ordering = ('name',)
+    readonly_fields = ('created_at',)
+    fieldsets = (
+        ('Basic information', {'fields': ('name', 'specialty', 'bio')}),
+        ('Contact', {'fields': ('phone', 'email', 'city')}),
+        ('Location (map)', {'fields': ('latitude', 'longitude')}),
+        ('Fees and availability', {'fields': ('fee', 'available', 'created_at')}),
+    )
+
+admin.site.site_header = 'Doctor Finder Admin'
+admin.site.site_title = 'Doctor Finder'
+
+Open http://127.0.0.1:8000/admin/, log in, and manage doctors.

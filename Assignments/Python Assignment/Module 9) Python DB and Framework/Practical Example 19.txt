@@ -1,0 +1,58 @@
+Practical Example 19: Login with Google or Facebook
+
+pip install django-allauth
+
+Settings (settings.py):
+
+INSTALLED_APPS += [
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.facebook',
+]
+SITE_ID = 1
+
+MIDDLEWARE += ['allauth.account.middleware.AccountMiddleware']
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+SOCIALACCOUNT_LOGIN_ON_GET = True        # go straight to the provider (skips the confirm page)
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {'client_id': os.environ.get('GOOGLE_CLIENT_ID', ''),
+                'secret': os.environ.get('GOOGLE_CLIENT_SECRET', ''), 'key': ''},
+        'SCOPE': ['profile', 'email'],
+    },
+    'facebook': {
+        'APP': {'client_id': os.environ.get('FACEBOOK_APP_ID', ''),
+                'secret': os.environ.get('FACEBOOK_APP_SECRET', ''), 'key': ''},
+        'METHOD': 'oauth2',
+        'SCOPE': ['email', 'public_profile'],
+    },
+}
+
+URLs (doctorfinder/urls.py, add). It is mounted under social/ so it does not clash with the accounts/ routes from Practical Example 13:
+
+    path('social/', include('allauth.urls')),
+python manage.py migrate
+
+Get the credentials:
+
+• Google: Google Cloud Console, APIs and Services, Credentials, Create OAuth client ID (Web application). Authorized redirect URI: http://127.0.0.1:8000/social/google/login/callback/.
+• Facebook: developers.facebook.com, create an app, add the Facebook Login product. Valid OAuth redirect URI: http://localhost:8000/social/facebook/login/callback/ (Facebook may require 
+HTTPS outside local development).
+• Set the values as environment variables: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, FACEBOOK_APP_ID, FACEBOOK_APP_SECRET.
+
+Buttons (add to registration/login.html):
+
+{% load socialaccount %}
+<p>Or sign in with:</p>
+<a class="btn" href="{% provider_login_url 'google' %}" style="background:#db4437">Google</a>
+<a class="btn" href="{% provider_login_url 'facebook' %}" style="background:#1877f2">Facebook</a>
+
+Flow: the user clicks the button, signs in at Google or Facebook, the provider returns to the callback URL with a code, and allauth creates or finds the Django user and logs them in (redirecting to LOGIN_REDIRECT_URL).

@@ -1,0 +1,83 @@
+Practical Example 10: JavaScript validation of email and phone in a registration form
+
+Files: static/js/validate.js, doctor/templates/doctor/register_user.html, views.py, urls.py
+// static/js/validate.js
+
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidPhone(phone) {
+    return /^[6-9]\d{9}$/.test(phone);          // 10 digits, first digit 6 to 9
+}
+
+function setError(id, message) {
+    document.getElementById(id).textContent = message;
+    return message === '';
+}
+
+function checkEmail() {
+    const value = document.getElementById('email').value.trim();
+    return setError('emailErr', isValidEmail(value) ? '' : 'Enter a valid email address');
+}
+
+function checkPhone() {
+    const value = document.getElementById('phone').value.trim();
+    return setError('phoneErr', isValidPhone(value) ? '' : 'Enter a valid 10-digit mobile number');
+}
+
+function checkPassword() {
+    const value = document.getElementById('password').value;
+    return setError('passErr', value.length >= 6 ? '' : 'Password must be at least 6 characters');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('userForm');
+    if (!form) return;
+
+    // live validation when the user leaves a field
+    document.getElementById('email').addEventListener('blur', checkEmail);
+    document.getElementById('phone').addEventListener('blur', checkPhone);
+    document.getElementById('password').addEventListener('blur', checkPassword);
+
+    form.addEventListener('submit', function (e) {
+        const ok = checkEmail() & checkPhone() & checkPassword();   // run all checks
+        if (!ok) e.preventDefault();
+    });
+});
+
+
+# doctor/views.py  (add)
+def register_user(request):
+    message = ''
+    if request.method == 'POST':
+        message = 'Registered: ' + request.POST.get('email', '')
+    return render(request, 'doctor/register_user.html', {'message': message})
+
+# doctor/urls.py  (add)
+    path('register-user/', views.register_user, name='register-user'),
+
+<!-- doctor/templates/doctor/register_user.html -->
+{% extends 'doctor/base.html' %}
+{% load static %}
+{% block content %}
+<h1>User Registration</h1>
+{% if message %}<p style="color:green">{{ message }}</p>{% endif %}
+<form id="userForm" method="post">
+    {% csrf_token %}
+    <p><input type="text" name="username" placeholder="Username" required></p>
+    <p><input type="text" name="email" id="email" placeholder="Email">
+       <span id="emailErr" style="color:red"></span></p>
+    <p><input type="text" name="phone" id="phone" placeholder="Mobile number">
+       <span id="phoneErr" style="color:red"></span></p>
+    <p><input type="password" name="password" id="password" placeholder="Password">
+       <span id="passErr" style="color:red"></span></p>
+    <button class="btn" type="submit">Register</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/validate.js' %}"></script>
+{% endblock %}
+
+The server must still validate the same data (see the Django forms in Practical Examples 12 and 13), because JavaScript checks can be bypassed.

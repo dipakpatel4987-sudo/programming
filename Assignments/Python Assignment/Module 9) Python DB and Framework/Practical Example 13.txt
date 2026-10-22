@@ -1,0 +1,130 @@
+Practical Example 13: Sign up, login, password reset, and profile update
+
+Settings (settings.py, add):
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'home'
+# Password reset emails are printed in the terminal (development only):
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+Profile model (models.py, add at the top from django.contrib.auth.models import User; then run makemigrations and migrate):
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    phone = models.CharField(max_length=15, blank=True)
+    city = models.CharField(max_length=50, blank=True)
+
+    def __str__(self):
+        return self.user.username
+
+Forms (forms.py, add):
+
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
+from .models import Profile
+
+class SignUpForm(UserCreationForm):
+    email = forms.EmailField(required=True)
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'password1', 'password2')
+
+class UserUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ('first_name', 'last_name', 'email')
+
+class ProfileForm(forms.ModelForm):
+    class Meta:
+        model = Profile
+        fields = ('phone', 'city')
+
+Views (views.py, add):
+
+from django.contrib import messages
+from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
+from .forms import SignUpForm, UserUpdateForm, ProfileForm
+from .models import Profile
+
+def signup(request):
+    form = SignUpForm(request.POST or None)
+    if form.is_valid():
+        user = form.save()
+        Profile.objects.create(user=user)
+        login(request, user)                       # log the new user in
+        return redirect('home')
+    return render(request, 'registration/signup.html', {'form': form})
+
+@login_required
+def profile(request):
+    profile_obj, _ = Profile.objects.get_or_create(user=request.user)
+    user_form = UserUpdateForm(request.POST or None, instance=request.user)
+    profile_form = ProfileForm(request.POST or None, instance=profile_obj)
+    if request.method == 'POST' and user_form.is_valid() and profile_form.is_valid():
+        user_form.save()
+        profile_form.save()
+        messages.success(request, 'Profile updated successfully.')
+        return redirect('my-profile')
+    return render(request, 'registration/profile.html',
+                  {'user_form': user_form, 'profile_form': profile_form})
+
+URLs. The built-in auth.urls supplies login, logout, password_change, password_reset, and related routes:
+
+# doctorfinder/urls.py  (add inside urlpatterns)
+    path('accounts/', include('django.contrib.auth.urls')),
+
+# doctor/urls.py  (add)
+    path('signup/', views.signup, name='signup'),
+    path('profile/', views.profile, name='my-profile'),
+
+Navigation (base.html, add inside <nav>). Django 5 requires logout to be a POST request:
+
+{% if user.is_authenticated %}
+    <a href="{% url 'my-profile' %}">{{ user.username }}</a>
+    <form method="post" action="{% url 'logout' %}" style="display:inline">
+        {% csrf_token %}<button type="submit" class="btn" style="margin:0;padding:4px 10px">Logout</button>
+    </form>
+{% else %}
+    <a href="{% url 'login' %}">Login</a>
+    <a href="{% url 'signup' %}">Sign up</a>
+{% endif %}
+
+Templates (put them in doctor/templates/registration/):
+
+<!-- login.html -->
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>Login</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Login</button>
+</form>
+<p><a href="{% url 'password_reset' %}">Forgot password?</a> | <a href="{% url 'signup' %}">Create account</a></p>
+{% endblock %}
+<!-- signup.html -->
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>Sign up</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Create account</button>
+</form>
+{% endblock %}
+<!-- profile.html -->
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>My Profile</h1>
+{% for m in messages %}<p style="color:green">{{ m }}</p>{% endfor %}
+<form method="post">
+    {% csrf_token %}
+    {{ user_form.as_p }}
+    {{ profile_form.as_p }}
+    <button class="btn" type="submit">Update profile</button>
+</form>
+<p><a href="{% url 'password change' %}">Change password</a></p>
+{% endblock %}
+
+Password reset: the pages for password_reset, password_reset_done, password_reset_confirm, and password_reset_complete (and password_change) are supplied by django.contrib.admin's built-in templates, so no extra HTML is needed. With the console email backend, copy the reset link from the terminal where runserver is running. For real emails, configure EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, and EMAIL_USE_TLS.

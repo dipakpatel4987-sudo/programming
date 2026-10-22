@@ -1,0 +1,513 @@
+Module 10: REST Framework: 
+
+Q1. 	What is an API (Application Programming Interface)?
+Answer: An API is a set of rules and endpoints that lets one software application communicate with another, requesting data or actions without knowing how the other system works 	internally. Analogy: a waiter takes your order (request) to the kitchen and brings back the food (response).
+	In web development, a web API receives an HTTP request (URL, method, headers, body) and returns a response (status code and data, usually JSON). Examples: weather data, payment 	processing, maps, login with Google.
+	import requests
+	r = requests.get("https://official-joke-api.appspot.com/random_joke")
+	print(r.status_code, r.json())
+
+Q2. 	What are the types of APIs: REST and SOAP?
+Answer:	---------------------------------------------------------------------------------------
+	Feature				REST				SOAP
+	----------------------------------------------------------------------------------------------
+	Full form			Representational State Transfer	Simple Object Access Protocol
+	Nature				Architectural style		Strict protocol
+	Data format			JSON (also XML, HTML, text)	XML only
+	Transport			HTTP (GET, POST, PUT, DELETE)	HTTP, SMTP, TCP and others
+	Speed / weight			Lightweight, faster		Heavier, slower
+	Contract			Flexible (OpenAPI optional)	Formal WSDL contract
+	Security			HTTPS, tokens, OAuth		Built-in WS-Security
+	Caching				Supported			Not supported
+	
+	Typical use
+	Web and mobile apps, public APIs
+	Banking and enterprise systems needing strict standards
+	Other styles: GraphQL (the client chooses exactly the data it needs) and gRPC (fast binary protocol).
+
+Q3. 	Why are APIs important in web development?
+Answer:
+	1. Integration: connect different systems and use third-party services (payments, maps, SMS).
+	2. Separation of frontend and backend: one backend can serve a website, an Android app, and an iOS app.
+	3. Reusability: write logic once and expose it to many clients.
+	4. Faster development: use existing services instead of building them.
+	5. Scalability and modularity: services (microservices) can be developed and scaled independently.
+	6. Automation and data sharing between organizations.
+	7. Security: expose only selected operations, not the database.
+	
+Q4. 	What does understanding project requirements involve?
+Answer: Before coding, the team clarifies what the system must do and under what conditions.
+	• Functional requirements: features (register doctors, search by specialty, book appointments, pay online).
+	• Non-functional requirements: performance, security, scalability, usability, availability.
+	• Users and roles: patient, doctor, admin, and their permissions.
+	• Data requirements: entities and relationships (Doctor, Patient, Appointment).
+	• External integrations: payment, maps, email, and SMS APIs.
+	• Technology choices: language, framework, database, hosting.
+	• Constraints: budget, time, legal rules (data privacy).
+	Outputs: a requirements document (SRS), user stories, wireframes, and an ER diagram. Clear requirements reduce rework and misunderstandings.
+
+Q5. 	How do you set up the environment and install necessary packages?
+Answer:
+	python -m venv env                 # isolated environment
+	source env/bin/activate            # Windows: env\Scripts\activate
+	pip install django djangorestframework requests
+	pip freeze > requirements.txt      # record exact versions
+	django-admin startproject doctorfinder
+	A typical requirements.txt:
+	Django>=4.2
+	djangorestframework>=3.14
+	requests>=2.31
+	django-allauth
+	django-cors-headers
+	mysqlclient
+	python-dotenv
+	Anyone can recreate the environment with pip install -r requirements.txt. Keep secrets in a .env file (not committed) and use a virtual environment for every project.
+
+Q6. 	What is serialization?
+Answer: Serialization converts complex data (Django model instances, QuerySets) into a simple format that can be sent over a network, such as JSON or XML. Deserialization is the reverse: 	converting incoming JSON into Python objects, validating it, and saving it to the database.
+	Example: a Doctor object becomes {"id": 1, "name": "Dr. Shah", "specialty": "Cardiology"}. It is needed because browsers and mobile apps understand JSON, not Python objects.
+
+Q7. 	How are Django QuerySets converted to JSON?
+Answer: Three ways:
+	# 1. Manual: values() + JsonResponse
+	from django.http import JsonResponse
+	def doctors(request):
+    		data = list(Doctor.objects.values("id", "name", "specialty"))
+    		return JsonResponse(data, safe=False)
+
+	# 2. Django's built-in serializer
+	from django.core.serializers import serialize
+	json_data = serialize("json", Doctor.objects.all())
+
+	# 3. DRF serializer (recommended)
+	serializer = DoctorSerializer(Doctor.objects.all(), many=True)
+		print(serializer.data)
+T	he DRF approach adds validation, customization, and nested relationships.
+
+Q8. 	How are serializers used in Django REST Framework (DRF)?
+Answer: A DRF serializer class defines which fields are converted and validated.
+	# serializers.py
+	from rest_framework import serializers
+	from .models import Doctor
+
+	class DoctorSerializer(serializers.ModelSerializer):
+    		class Meta:
+        		model = Doctor
+        		fields = ["id", "name", "specialty", "phone", "email"]   # or "__all__"
+	• Serialize: DoctorSerializer(obj).data; use many=True for a QuerySet.
+	• Deserialize and save:
+	s = DoctorSerializer(data=request.data)
+	if s.is_valid():
+    		s.save()                 # create (or update if an instance was given)
+	else:
+    		print(s.errors)
+	Types: serializers.Serializer (manual fields) and ModelSerializer (auto-built from a model, with default create() and update()). Add custom checks with validate_<field>() or 	validate().
+
+
+Q9. 	What are the HTTP request methods (GET, POST, PUT, DELETE)?
+Answer:	--------------------------------------------------------------------------------------------------------------------------
+	Method			Purpose					CRUD	Has body?		Example
+	--------------------------------------------------------------------------------------------------------------------------
+	GET			Retrieve data				Read	No			GET /doctors/
+	POST			Create a new resource			Create	Yes			POST /doctors/
+	PUT			Replace/update a whole resource		Update	Yes			PUT /doctors/1/
+	PATCH			Partially update			Update	Yes			PATCH /doctors/1/
+	DELETE			Remove a resource			Delete	No			DELETE /doctors/1/
+
+GET is safe (does not change data) and idempotent; PUT and DELETE are idempotent (repeating gives the same result); POST is not. Other methods: HEAD and OPTIONS.
+
+Q10. 	How are requests received and responses sent in DRF?
+Answer: DRF provides its own Request and Response objects.
+	• request.data: the parsed body (JSON, form data) for POST, PUT, and PATCH. request.query_params: the URL query string. request.user and request.auth hold authentication info.
+	• Response(data, status=...): renders data to JSON (or another format via content negotiation, e.g., the browsable API).
+	• Status codes from rest_framework.status: HTTP_200_OK, HTTP_201_CREATED, HTTP_204_NO_CONTENT, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, 	HTTP_500_INTERNAL_SERVER_ERROR.
+	from rest_framework.decorators import api_view
+	from rest_framework.response import Response
+	from rest_framework import status
+
+	@api_view(["GET", "POST"])
+	def doctor_list(request):
+    		if request.method == "GET":
+        		return Response(DoctorSerializer(Doctor.objects.all(), many=True).data)
+    		s = DoctorSerializer(data=request.data)
+    		if s.is_valid():
+        		s.save()
+        		return Response(s.data, status=status.HTTP_201_CREATED)
+    		return Response(s.errors, status=status.HTTP_400_BAD_REQUEST)
+
+Q11. 	What are views in DRF, and how do function-based views differ from class-based views?
+Answer: A view receives a request, processes it (usually with serializers and models), and returns a response.
+	Function-based view (FBV): a function with the @api_view decorator (example in section 4). Simple, explicit, and good for small or custom endpoints.
+	Class-based view (CBV): a class with a method per HTTP verb, or built from DRF's ready-made generic classes.
+	from rest_framework.views import APIView
+	from rest_framework import generics
+
+	class DoctorList(APIView):                      # APIView
+    		def get(self, request):
+        		return Response(DoctorSerializer(Doctor.objects.all(), many=True).data)
+    		def post(self, request):
+        		s = DoctorSerializer(data=request.data)
+        		s.is_valid(raise_exception=True)
+        		s.save()
+        		return Response(s.data, status=201)
+
+	class DoctorListCreate(generics.ListCreateAPIView):       # Generic view
+    		queryset = Doctor.objects.all()
+    		serializer_class = DoctorSerializer
+
+	class DoctorDetail(generics.RetrieveUpdateDestroyAPIView):
+    		queryset = Doctor.objects.all()
+    		serializer_class = DoctorSerializer
+	---------------------------------------------------------------------------------------------------------------
+	Feature				Function-based			Class-based
+	----------------------------------------------------------------------------------------------------------------
+	Code amount			More repetition			Less, with generics and mixins
+	Reuse				Low				High (inheritance)
+	Readability			Simple, explicit		Organized by method
+	Flexibility			Easy to customize		Needs knowledge of the class hierarchy
+
+	DRF also offers ViewSets with routers (ModelViewSet), which provide full CRUD in a few lines.
+
+Q12. 	How do you define URLs and link them to views?
+Answer:
+	# urls.py
+	from django.urls import path, include
+	from . import views
+
+	urlpatterns = [
+   	 	path("doctors/", views.DoctorListCreate.as_view(), name="doctor-list"),
+    		path("doctors/<int:pk>/", views.DoctorDetail.as_view(), name="doctor-detail"),
+	]
+	• Class-based views use .as_view(); function views are passed directly.
+	• <int:pk> captures the ID and passes it to the view.
+	• The project urls.py includes the app's file: path("api/", include("doctor.urls")).
+	Routers with ViewSets generate URLs automatically:
+	from rest_framework.routers import DefaultRouter
+	router = DefaultRouter()
+	router.register("doctors", DoctorViewSet)
+	urlpatterns = [path("api/", include(router.urls))]
+	This gives /api/doctors/ (list, create) and /api/doctors/<id>/ (retrieve, update, delete).
+
+Q13. 	How is pagination added to APIs to handle large data sets?
+Answer: Pagination splits a large result set into pages so the server and client do not handle thousands of records at once. It improves speed, memory use, and user experience.
+	Global setting:
+	# settings.py
+	REST_FRAMEWORK = {
+    		"DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    		"PAGE_SIZE": 10,
+	}
+	Request GET /doctors/?page=2 returns:
+	{"count": 55, "next": ".../doctors/?page=3", "previous": ".../doctors/?page=1", "results": [ ... ]}
+	Types: PageNumberPagination (page numbers), LimitOffsetPagination (?limit=10&offset=20), and CursorPagination (opaque cursor; efficient for large, changing data). A custom 	paginator can set page_size, page_size_query_param, and max_page_size. Generic views and ViewSets apply pagination automatically; a plain APIView needs it applied manually.
+
+Q14. 	How do you configure Django settings for the database, static files, and API keys?
+Answer: All configuration is in settings.py.
+	# Database
+	DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3",
+                         "NAME": BASE_DIR / "db.sqlite3"}}      # or mysql settings
+
+	# Static and media files
+	STATIC_URL = "/static/"
+	STATICFILES_DIRS = [BASE_DIR / "static"]
+	STATIC_ROOT = BASE_DIR / "staticfiles"
+	MEDIA_URL = "/media/"
+	MEDIA_ROOT = BASE_DIR / "media"
+
+	# Installed apps
+	INSTALLED_APPS = [..., "rest_framework", "doctor"]
+
+	# API keys and secrets: read from environment variables
+	import os
+	SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
+	GOOGLE_MAPS_KEY = os.environ.get("GOOGLE_MAPS_KEY")
+	DEBUG = os.environ.get("DEBUG") == "True"
+	ALLOWED_HOSTS = ["yourdomain.com"]
+	Best practice: never hard-code or commit secrets; use environment variables or a .env file (with python-dotenv or django-environ). Use separate settings for development and 	production, set DEBUG = False in production, and also configure ALLOWED_HOSTS, TEMPLATES, MIDDLEWARE, EMAIL_*, and REST_FRAMEWORK as needed.
+
+Q15. 	How do you set up a Django REST Framework project?
+Answer:
+	1. Create and activate a virtual environment.
+	2. pip install django djangorestframework.
+	3. django-admin startproject doctorfinder and cd doctorfinder.
+	4. python manage.py startapp doctor_finder.
+	5. Register both in settings.py: INSTALLED_APPS += ["rest_framework", "doctor_finder"].
+	6. Define the model in models.py.
+	7. Run makemigrations and migrate.
+	8. Create serializers.py (serializer classes) and views.py (API views).
+	9. Create the app's urls.py and include it in the project URLs.
+	10. Register the model in admin.py (optional), create a superuser, and run python manage.py runserver.
+	11. Test with the DRF browsable API, Postman, or curl.
+	# models.py
+	class Doctor(models.Model):
+    		name = models.CharField(max_length=100)
+    		specialty = models.CharField(max_length=50)
+    		phone = models.CharField(max_length=15)
+    		email = models.EmailField(unique=True)
+
+
+Q16. 	How is social authentication (Google, Facebook) implemented in Django?
+Answer: Social login uses OAuth2: the user authenticates with a provider, which sends your app a token and the user's profile. With django-allauth:
+	1. pip install django-allauth.
+	2. Add django.contrib.sites, allauth, allauth.account, allauth.socialaccount, and allauth.socialaccount.providers.google to INSTALLED_APPS; set SITE_ID = 1, the allauth 	authentication backend, and its middleware.
+	3. Add path("accounts/", include("allauth.urls")); run migrate.
+	4. Create OAuth credentials in the provider's console (Client ID and Secret) with the callback URL /accounts/google/login/callback/.
+	5. Add them as a Social Application in the Django admin (or in settings).
+	6. Link to {% url 'google_login' %} in a template.
+	For APIs consumed by mobile apps, use dj-rest-auth with allauth: the app sends the provider's access token to the backend, which returns your own token or JWT. Keep client secrets 	private.
+
+Q17. 	How are emails and OTPs sent using third-party APIs like Twilio and SendGrid?
+Answer: SendGrid sends emails and Twilio sends SMS (and WhatsApp/voice); both give an API key or account credentials.
+	OTP flow: (1) generate a random 4 to 6 digit code; (2) store it with an expiry (cache or database), linked to the user; (3) send it by SMS or email; (4) the user submits it; (5) 	the server checks the match and the expiry, then deletes it; (6) limit attempts to prevent brute force.
+	import secrets
+	from twilio.rest import Client
+
+	otp = str(secrets.randbelow(900000) + 100000)     # secure 6-digit code
+	client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+	client.messages.create(body=f"Your OTP is {otp}",
+                       from_=TWILIO_NUMBER, to="+91XXXXXXXXXX")
+	# SendGrid (email)
+	from sendgrid import SendGridAPIClient
+	from sendgrid.helpers.mail import Mail
+	msg = Mail(from_email="noreply@site.com", to_emails="user@mail.com",
+           	subject="Your OTP", html_content=f"<b>{otp}</b>")
+	SendGridAPIClient(SENDGRID_API_KEY).send(msg)
+	Keep keys in environment variables, never log OTPs, and make them expire quickly (for example 5 minutes).
+
+Q18. 	What are the REST principles: statelessness, resource-based URLs, and HTTP methods for CRUD?
+Answer: REST is an architectural style with these principles:
+	1. Client-server separation: frontend and backend evolve independently.
+	2. Statelessness: every request contains all the information needed (e.g., an auth token); the server stores no client session state between requests. This makes APIs easy to 	scale.
+	3. Resource-based URLs: URLs name things (nouns), not actions: /doctors/ and /doctors/5/, not /getDoctor or /deleteDoctor. Use plural nouns and nesting for relations 	(/doctors/5/appointments/).
+	4. Uniform interface using HTTP methods for actions:	
+	-----------------------------------------------------------------------------
+	Action		Method		URL			Success status
+	-------------------------------------------------------------------------------
+	List		GET		/doctors/		200
+	Retrieve	GET		/doctors/5/		200
+	Create		POST		/doctors/		201
+	Update		PUT		/PATCH/doctors/5/	200
+	Delete		DELETE		/doctors/5/		204
+
+	5. Representations: resources are exchanged as JSON.
+	6. Cacheable responses and a layered system.
+	Good practice: correct status codes, versioning (/api/v1/), pagination, filtering, and clear error messages.
+
+Q19. 	What is CRUD, and why is it fundamental to backend development?
+
+Answer: CRUD stands for the four basic operations on stored data:
+	-----------------------------------------------------------------------------------------------------------
+	Operation			SQL			HTTP				Django ORM
+	------------------------------------------------------------------------------------------------------------
+	Create				INSERT			POST				Model.objects.create()
+	Read				SELECT			GET				.all(), .get(), .filter()
+	Update				UPDATE			PUT/PATCH			.save(), .update()
+	Delete				DELETE			DELETE				.delete()
+
+	Why fundamental: almost every application (user accounts, products, appointments, posts) is built on managing records with these four operations. They map directly to database 	commands and HTTP methods, so they form the standard pattern for APIs. In DRF, a whole CRUD API for a model can be built with one ModelViewSet:
+	class DoctorViewSet(viewsets.ModelViewSet):
+    		queryset = Doctor.objects.all()
+    		serializer_class = DoctorSerializer
+
+Q20. 	What is the difference between authentication and authorization?
+Answer:
+	---------------------------------------------------------------------------------------------------------------------------
+	Feature				Authentication				Authorization
+	---------------------------------------------------------------------------------------------------------------------------
+	Question answered		Who are you?				What are you allowed to do?
+	Purpose				Verify identity				Control access to resources
+	Order				First					After authentication
+	Methods				Password, token, OTP, social login	Roles, permissions, policies
+	Failure code			401 Unauthorized			403 Forbidden
+	DRF setting			authentication_classes			permission_classes
+
+	Example: logging in proves you are Dr. Shah (authentication); being allowed to edit only your own profile, while only admins can delete doctors, is authorization.
+
+Q21. 	How is authentication implemented with Django REST Framework's token-based system?
+Answer: In token authentication, the user logs in once with credentials, receives a token, and sends it with each later request in a header, so no session is needed (stateless).
+	# settings.py
+	INSTALLED_APPS += ["rest_framework", "rest_framework.authtoken"]
+	REST_FRAMEWORK = {
+    	"DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.TokenAuthentication"],
+    	"DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+	}
+	# run: python manage.py migrate
+
+	# urls.py: built-in login endpoint that returns a token
+	from rest_framework.authtoken.views import obtain_auth_token
+	path("api/login/", obtain_auth_token)
+	# restrict a view
+	from rest_framework.permissions import IsAuthenticated, IsAdminUser
+	class DoctorDelete(generics.DestroyAPIView):
+    		permission_classes = [IsAuthenticated, IsAdminUser]
+	Client usage: POST /api/login/ with username and password returns {"token": "abc123..."}; later requests send the header Authorization: Token abc123.... Tokens are created per user 	(Token.objects.get_or_create(user=user)), and logout deletes the token. Always use HTTPS. Alternatives: JWT (djangorestframework-simplejwt, with expiring access and refresh 	tokens), session authentication, and OAuth2. Built-in permissions: AllowAny, IsAuthenticated, IsAdminUser, IsAuthenticatedOrReadOnly, plus custom classes.
+
+Q22. 	What is the OpenWeatherMap API, and how do you retrieve weather data?
+Answer: OpenWeatherMap is a web service providing current weather, forecasts, and historical data for locations worldwide. It requires a free API key from openweathermap.org (check the 	current plan limits and endpoint versions in their documentation).
+	import requests
+
+	def get_weather(city, api_key):
+    		url = "https://api.openweathermap.org/data/2.5/weather"
+    		params = {"q": city, "appid": api_key, "units": "metric"}
+    		r = requests.get(url, params=params, timeout=10)
+    		if r.status_code == 200:
+        		d = r.json()
+        		return {"city": d["name"],
+                		"temp": d["main"]["temp"],
+                		"humidity": d["main"]["humidity"],
+                		"description": d["weather"][0]["description"]}
+    		return None
+
+	Key parameters: q (city) or lat/lon, appid (key), units (metric, imperial), lang. The response is JSON with main (temperature, humidity, pressure), weather, wind, and sys. In 	Django, call this from a view and pass the result to a template. Handle errors (404 city not found, 401 invalid key) and keep the key in settings or environment variables.
+
+Q23. 	How does the Google Maps Geocoding API convert addresses into coordinates?
+Answer: Geocoding converts a human-readable address into latitude and longitude (and reverse geocoding converts coordinates into an address). It needs a Google Cloud API key with the 	Geocoding API enabled (billing must be enabled; a free monthly credit applies).
+	import requests
+
+	def geocode(address, api_key):
+    		url = "https://maps.googleapis.com/maps/api/geocode/json"
+    		r = requests.get(url, params={"address": address, "key": api_key}, timeout=10)
+    		data = r.json()
+    		if data["status"] == "OK":
+        		loc = data["results"][0]["geometry"]["location"]
+        		return loc["lat"], loc["lng"]
+    		return None
+	The response status can be OK, ZERO_RESULTS, OVER_QUERY_LIMIT, or REQUEST_DENIED; results[0] also contains formatted_address and place_id. Uses: store a doctor's coordinates, show 	markers on a map, and search nearby. Restrict and protect the key.
+
+Q24. 	What is the GitHub API, and how do you interact with repositories, pull requests, and issues?
+Answer: The GitHub REST API (https://api.github.com) lets programs manage repositories, issues, pull requests, users, and more. Public data can be read without authentication (with low 	rate limits); creating or changing things needs a personal access token sent in the header.
+	import requests
+	headers = {"Authorization": f"Bearer {TOKEN}", "Accept": "application/vnd.github+json"}
+
+	# Get a user's data and public repositories
+	user = requests.get("https://api.github.com/users/octocat").json()
+	repos = requests.get("https://api.github.com/users/octocat/repos").json()
+	for r in repos:
+    		print(r["name"], r["html_url"])
+
+	# Create a repository (authenticated user)
+	requests.post("https://api.github.com/user/repos", headers=headers,
+              json={"name": "demo-repo", "private": False})
+
+	# Create an issue
+	requests.post("https://api.github.com/repos/OWNER/REPO/issues", headers=headers,
+              json={"title": "Bug found", "body": "Details..."})
+
+	# List pull requests
+	requests.get("https://api.github.com/repos/OWNER/REPO/pulls", headers=headers)
+	Common endpoints: /users/{user}, /repos/{owner}/{repo}, /issues, /pulls. Responses are JSON with pagination (per_page, page). Authentication raises rate limits, and tokens must be 	kept secret.
+
+Q25. 	How is the Twitter (X) API used to fetch and post tweets and retrieve user data?
+Answer: The Twitter/X API (v2) gives programmatic access to posts (tweets), users, and timelines. Access requires a developer account, an app, and credentials (API key and secret, and a 	Bearer token or OAuth tokens). Access tiers, pricing, and which endpoints are available have changed several times, so check the current X developer documentation before building.
+	• Read (app-only Bearer token): user lookup and a user's recent posts.
+	• Write (OAuth 1.0a or OAuth 2.0 user context): post, like, or delete tweets on behalf of a user.
+	import requests
+	headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
+
+	# Look up a user and get the latest 5 tweets
+	user = requests.get("https://api.twitter.com/2/users/by/username/example",
+                    headers=headers).json()
+	uid = user["data"]["id"]
+	tweets = requests.get(f"https://api.twitter.com/2/users/{uid}/tweets",
+                      headers=headers, params={"max_results": 5}).json()
+	for t in tweets.get("data", []):
+    		print(t["text"])
+	Libraries such as Tweepy simplify authentication and calls. Handle rate limits (HTTP 429) and errors, and keep tokens secret.
+
+Q26. 	What is the REST Countries API, and how do you retrieve country-specific data?
+Answer: REST Countries (restcountries.com) is a free public API returning information about countries (name, capital, population, languages, currencies, region, flag), and it needs no API 	key.
+	import requests
+
+	def country_info(name):
+    		r = requests.get(f"https://restcountries.com/v3.1/name/{name}", timeout=10)
+    		if r.status_code != 200:
+        		return None
+    			c = r.json()[0]
+    		return {
+        	"name": c["name"]["common"],
+        	"capital": c.get("capital", ["N/A"])[0],
+        	"population": c["population"],
+        	"languages": list(c.get("languages", {}).values()),
+        	"currencies": [v["name"] for v in c.get("currencies", {}).values()],
+        	"flag": c["flags"]["png"],
+    		}
+	Common endpoints: /all, /name/{name}, /alpha/{code}, /region/{region}, /currency/{code}, /lang/{language}. The response is a list of country objects with nested dictionaries. In 	Django, the view takes the user's input, calls the API, and passes the result to a template. Handle 404 (not found) and network errors.
+
+Q27. 	How are email APIs like SendGrid and Mailchimp used to send transactional emails?
+Answer: Email APIs deliver emails reliably through a provider's infrastructure, with good deliverability (avoiding spam folders), tracking, and templates.
+	• Transactional emails: triggered by user actions: registration confirmation, password reset, OTP, receipts, appointment reminders. SendGrid is built for this; Mailchimp offers 	Mailchimp Transactional (Mandrill) for transactional email, and is best known for marketing campaigns and newsletters.
+	• Marketing emails: bulk newsletters and campaigns to lists.
+	Steps: create an account and API key, verify the sender email or domain, then call the API or use SMTP.
+	from sendgrid import SendGridAPIClient
+	from sendgrid.helpers.mail import Mail
+
+	def send_confirmation(to_email, name):
+    	message = Mail(
+        	from_email="noreply@doctorfinder.com",
+        	to_emails=to_email,
+        	subject="Registration successful",
+        	html_content=f"<p>Welcome, {name}! Your account is ready.</p>")
+    		SendGridAPIClient(settings.SENDGRID_API_KEY).send(message)
+	Call it from the registration view after the user is saved. Alternatively configure Django's SMTP backend (EMAIL_HOST = "smtp.sendgrid.net", EMAIL_HOST_USER = "apikey", 	EMAIL_HOST_PASSWORD = <API key>) and use send_mail(). Keep the key in environment variables.
+
+Q28. 	What is the Twilio API, and how is it used to send SMS and OTPs?
+Answer: Twilio is a cloud communications platform with APIs for SMS, voice, WhatsApp, and verification. After signing up you get an Account SID, an Auth Token, and a Twilio phone number 	(trial accounts can message only verified numbers).
+	from twilio.rest import Client
+
+	client = Client(ACCOUNT_SID, AUTH_TOKEN)
+	message = client.messages.create(
+    		body="Your OTP is 483920",
+    		from_="+1XXXXXXXXXX",          # Twilio number
+    		to="+91XXXXXXXXXX")            # user's number in E.164 format
+	print(message.sid)
+	OTP flow in registration: generate a random code (use Python's secrets module), save it with an expiry, send it by SMS, the user enters it, and the server verifies it and marks the 	phone number as verified. Twilio also has the Verify API, which generates, sends, and checks OTPs for you. Install with pip install twilio; protect credentials with environment 	variables, add expiry and attempt limits, and note that SMS has a per-message cost and country regulations (sender registration).
+
+Q29. 	How are payment gateways like PayPal and Stripe integrated?
+Answer: A payment gateway securely processes payments so your server never stores raw card data (reducing PCI-compliance burden). Stripe and PayPal both provide hosted checkout pages and 	APIs.
+	Stripe flow (Checkout):
+	1. Create an account and get publishable and secret API keys (test mode first).
+	2. pip install stripe; keep the secret key in environment variables.
+	3. The server creates a Checkout Session with the item, amount, currency, and success/cancel URLs.
+	4. Redirect the user to Stripe's hosted payment page.
+	5. Stripe redirects back to your success URL.
+	6. Confirm payment using a webhook (checkout.session.completed), verifying its signature, then mark the order or appointment as paid.
+	import stripe
+	stripe.api_key = settings.STRIPE_SECRET_KEY
+
+	def create_checkout(request):
+    		session = stripe.checkout.Session.create(
+        	mode="payment",
+        	line_items=[{"price_data": {"currency": "inr",
+                                    "product_data": {"name": "Doctor Appointment"},
+                                    "unit_amount": 50000},      # smallest unit (paise)
+                     			"quantity": 1}],
+        	success_url="https://site.com/success/",
+        	cancel_url="https://site.com/cancel/")
+    		return redirect(session.url)
+	PayPal: create a REST app to get a client ID and secret; create an order through the Orders API (or use the JavaScript Smart Buttons); the user approves on PayPal; your server 	captures the order and records it.
+	Key rules: never trust the client for amounts or payment status, always verify via webhooks or server calls, use HTTPS, test in sandbox/test mode, and handle failures, refunds, and 	duplicate events.
+
+Q30. 	How is the Google Maps API used to display maps and calculate distances between locations?
+Answer: Google offers several related APIs (all need an API key, billing enabled, and key restrictions):
+	• Maps JavaScript API: shows interactive maps with markers and info windows in the browser.
+	• Geocoding API: address to coordinates.
+	• Places API: search for places and details.
+	• Distance Matrix API / Routes API: travel distance and time between origins and destinations. Check Google's current documentation, since the newer Routes API is replacing some 	older services.
+	• Directions API: step-by-step routes.
+	Displaying doctor locations:
+	<div id="map" style="height:400px"></div>
+	<script>
+  		function initMap() {
+    		const map = new google.maps.Map(document.getElementById("map"),
+                                    {center: {lat: 23.02, lng: 72.57}, zoom: 11});
+    		doctors.forEach(d => new google.maps.Marker(
+        		{position: {lat: d.lat, lng: d.lng}, map: map, title: d.name}));
+  		}
+	</script>
+	<script async src="https://maps.googleapis.com/maps/api/js?key=API_KEY&callback=initMap"></script>
+	Calculating distance (server side):
+	r = requests.get("https://maps.googleapis.com/maps/api/distancematrix/json",
+                 	params={"origins": "Ahmedabad", "destinations": "Surat",
+                         	"key": API_KEY}).json()
+	el = r["rows"][0]["elements"][0]
+	print(el["distance"]["text"], el["duration"]["text"])
+	The straight-line distance between two coordinates can also be computed without an API using the Haversine formula. Protect keys with referrer or IP restrictions, and cache results 	to reduce cost.

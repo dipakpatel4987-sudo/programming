@@ -1,0 +1,105 @@
+Practical Example 12: CRUD operations on doctor profiles using the Django ORM
+
+Form (doctor/forms.py, new file):
+from django import forms
+from .models import Doctor
+
+class DoctorForm(forms.ModelForm):
+    class Meta:
+        model = Doctor
+        fields = ['name', 'specialty', 'city', 'phone', 'email', 'fee',
+                  'bio', 'available', 'latitude', 'longitude']
+
+Views (doctor/views.py; this replaces the earlier doctor_list with a searchable version):
+
+from django.db.models import Q
+from django.shortcuts import render, get_object_or_404, redirect
+from .forms import DoctorForm
+from .models import Doctor
+
+def doctor_list(request):                                   # READ (list + search)
+    q = request.GET.get('q', '')
+    doctors = Doctor.objects.all().order_by('name')
+    if q:
+        doctors = doctors.filter(Q(name__icontains=q) |
+                                 Q(specialty__icontains=q) |
+                                 Q(city__icontains=q))
+    return render(request, 'doctor/doctor_list.html', {'doctors': doctors, 'q': q})
+
+def doctor_create(request):                                 # CREATE
+    form = DoctorForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+        return redirect('doctors')
+    return render(request, 'doctor/doctor_form.html', {'form': form, 'title': 'Add Doctor'})
+
+def doctor_update(request, id):                             # UPDATE
+    doctor = get_object_or_404(Doctor, id=id)
+    form = DoctorForm(request.POST or None, instance=doctor)
+    if form.is_valid():
+        form.save()
+        return redirect('doctors')
+    return render(request, 'doctor/doctor_form.html', {'form': form, 'title': 'Edit Doctor'})
+
+def doctor_delete(request, id):                             # DELETE
+    doctor = get_object_or_404(Doctor, id=id)
+    if request.method == 'POST':
+        doctor.delete()
+        return redirect('doctors')
+    return render(request, 'doctor/doctor_confirm_delete.html', {'doctor': doctor})
+
+URLs (doctor/urls.py, add):
+    path('doctors/add/', views.doctor_create, name='doctor-add'),
+    path('doctors/<int:id>/edit/', views.doctor_update, name='doctor-edit'),
+    path('doctors/<int:id>/delete/', views.doctor_delete, name='doctor-delete'),
+
+Templates:
+<!-- doctor_list.html (replace) -->
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>Our Doctors</h1>
+<form method="get">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search name, specialty, city">
+    <button class="btn" type="submit" style="margin:0">Search</button>
+    <a class="btn" href="{% url 'doctor-add' %}" style="margin:0">+ Add Doctor</a>
+</form>
+<table border="1" cellpadding="6" style="margin-top:12px;width:100%">
+    <tr><th>Name</th><th>Specialty</th><th>City</th><th>Fee</th><th>Actions</th></tr>
+    {% for d in doctors %}
+    <tr>
+        <td><a href="{% url 'profile' d.id %}">{{ d.name }}</a></td>
+        <td>{{ d.specialty }}</td><td>{{ d.city }}</td><td>{{ d.fee }}</td>
+        <td><a href="{% url 'doctor-edit' d.id %}">Edit</a> |
+            <a href="{% url 'doctor-delete' d.id %}">Delete</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">No doctors found.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}
+
+<!-- doctor_form.html (used for both Create and Update) -->
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Save</button>
+    <a href="{% url 'doctors' %}">Cancel</a>
+</form>
+{% endblock %}
+
+<!-- doctor_confirm_delete.html -->
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>Delete doctor?</h1>
+<p>Are you sure you want to delete <strong>{{ doctor.name }}</strong>?</p>
+<form method="post">
+    {% csrf_token %}
+    <button class="btn" type="submit" style="background:#dc3545">Yes, delete</button>
+    <a href="{% url 'doctors' %}">Cancel</a>
+</form>
+{% endblock %}
+
+The equivalent raw ORM calls are Doctor.objects.create(...), Doctor.objects.filter(...), doctor.save() or .update(...), and doctor.delete().

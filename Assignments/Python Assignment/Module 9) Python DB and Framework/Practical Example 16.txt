@@ -1,0 +1,116 @@
+Practical Example 16: Paytm payments for the Doctor Finder project
+
+	Paytm's API details, hosts, and checksum library change over time, so check Paytm's current developer documentation before going live. Create a merchant account and use the staging 	(test) credentials first. Keep the Merchant ID and Merchant Key out of source code.
+
+pip install requests
+# Checksum helper: use Paytm's official PaytmChecksum library
+# (the paytmchecksum package, or PaytmChecksum.py from Paytm's GitHub repository placed in the project root)
+
+Settings (settings.py, add):
+
+import os
+PAYTM_MID = os.environ.get('PAYTM_MID', 'YOUR_MERCHANT_ID')
+PAYTM_MERCHANT_KEY = os.environ.get('PAYTM_MERCHANT_KEY', 'YOUR_MERCHANT_KEY')
+PAYTM_WEBSITE = 'WEBSTAGING'                         # production: the website name Paytm gives you
+PAYTM_HOST = 'https://securegw-stage.paytm.in'       # production: https://securegw.paytm.in
+PAYTM_CALLBACK_URL = 'http://127.0.0.1:8000/payment/callback/'
+
+Model (models.py, add, then run makemigrations and migrate):
+
+class Payment(models.Model):
+    STATUS = [('PENDING', 'Pending'), ('SUCCESS', 'Success'), ('FAILED', 'Failed')]
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    doctor = models.ForeignKey(Doctor, on_delete=models.SET_NULL, null=True)
+    order_id = models.CharField(max_length=40, unique=True)
+    amount = models.DecimalField(max_digits=8, decimal_places=2)
+    txn_id = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.order_id} - {self.status}'
+
+Views (views.py, add):
+
+import json
+import uuid
+import requests
+import PaytmChecksum                                  # Paytm's checksum library
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from .models import Payment
+
+@login_required
+def pay_for_doctor(request, id):
+    doctor = get_object_or_404(Doctor, id=id)
+    order_id = 'ORD' + uuid.uuid4().hex[:12].upper()
+    Payment.objects.create(user=request.user, doctor=doctor,
+                           order_id=order_id, amount=doctor.fee)
+
+    body = {
+        'requestType': 'Payment',
+        'mid': settings.PAYTM_MID,
+        'websiteName': settings.PAYTM_WEBSITE,
+        'orderId': order_id,
+        'callbackUrl': settings.PAYTM_CALLBACK_URL,
+        'txnAmount': {'value': f'{doctor.fee:.2f}', 'currency': 'INR'},
+        'userInfo': {'custId': str(request.user.id)},
+    }
+    # sign the request so it cannot be tampered with
+    signature = PaytmChecksum.generateSignature(json.dumps(body), settings.PAYTM_MERCHANT_KEY)
+    payload = json.dumps({'body': body, 'head': {'signature': signature}})
+
+    url = (f'{settings.PAYTM_HOST}/theia/api/v1/initiateTransaction'
+           f'?mid={settings.PAYTM_MID}&orderId={order_id}')
+    reply = requests.post(url, data=payload,
+                          headers={'Content-Type': 'application/json'}, timeout=15).json()
+    token = reply.get('body', {}).get('txnToken')
+
+    if not token:                                    # Paytm refused to start the transaction
+        Payment.objects.filter(order_id=order_id).update(status='FAILED')
+        return render(request, 'doctor/payment_result.html',
+                      {'success': False, 'message': 'Could not start the payment.'})
+
+    return render(request, 'doctor/payment_redirect.html',
+                  {'host': settings.PAYTM_HOST, 'mid': settings.PAYTM_MID,
+                   'order_id': order_id, 'txn_token': token})
+
+@csrf_exempt                                         # Paytm posts here from outside our site
+def payment_callback(request):
+    params = {k: v for k, v in request.POST.items()}
+    checksum = params.pop('CHECKSUMHASH', '')
+    valid = PaytmChecksum.verifySignature(params, settings.PAYTM_MERCHANT_KEY, checksum)
+
+    paid = valid and params.get('STATUS') == 'TXN_SUCCESS'
+    # In production also call Paytm's Transaction Status API to confirm the result.
+    Payment.objects.filter(order_id=params.get('ORDERID', '')).update(
+        status='SUCCESS' if paid else 'FAILED', txn_id=params.get('TXNID', ''))
+    return render(request, 'doctor/payment_result.html',
+                  {'success': paid,
+                   'message': 'Payment received. Thank you!' if paid else 'Payment failed or was cancelled.'})
+
+URLs (doctor/urls.py, add):
+
+    path('pay/<int:id>/', views.pay_for_doctor, name='pay'),
+    path('payment/callback/', views.payment_callback, name='payment-callback'),
+
+Templates:
+
+<!-- payment_redirect.html : sends the user to Paytm's payment page automatically -->
+<p>Redirecting to Paytm, please do not refresh...</p>
+<form id="paytm" method="post"
+      action="{{ host }}/theia/api/v1/showPaymentPage?mid={{ mid }}&amp;orderId={{ order_id }}">
+    <input type="hidden" name="mid" value="{{ mid }}">
+    <input type="hidden" name="orderId" value="{{ order_id }}">
+    <input type="hidden" name="txnToken" value="{{ txn_token }}">
+</form>
+<script>document.getElementById('paytm').submit();</script>
+<!-- payment_result.html -->
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>{% if success %}Payment successful{% else %}Payment failed{% endif %}</h1>
+<p>{{ message }}</p>
+<a class="btn" href="{% url 'doctors' %}">Back to doctors</a>
+{% endblock %}
+
+Add a Pay button in profile.html: <a class="btn" href="{% url 'pay' doctor.id %}">Pay consultation fee</a>. Register the model in admin.py with from .models import Payment and admin.site.register(Payment).

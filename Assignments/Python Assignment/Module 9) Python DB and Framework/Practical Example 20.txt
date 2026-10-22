@@ -1,0 +1,90 @@
+
+Practical Example 20: Show doctor locations with the Google Maps API
+
+In Google Cloud Console enable the Maps JavaScript API, enable billing, create an API key, and restrict it to your website address. Store each doctor's latitude and longitude (the fields already exist in the Doctor model).
+
+Settings (settings.py, add):
+
+GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY', '')
+
+View (views.py, add):
+
+from django.conf import settings
+
+def doctor_map(request):
+    doctors = list(Doctor.objects.exclude(latitude__isnull=True)
+                                 .exclude(longitude__isnull=True)
+                                 .values('id', 'name', 'specialty', 'city', 'latitude', 'longitude'))
+    return render(request, 'doctor/doctor_map.html',
+                  {'doctors': doctors, 'maps_key': settings.GOOGLE_MAPS_API_KEY})
+
+URL (doctor/urls.py, add): path('map/', views.doctor_map, name='doctor-map'),
+
+Template (doctor/templates/doctor/doctor_map.html):
+{% extends 'doctor/base.html' %}
+{% block content %}
+<h1>Doctor Locations</h1>
+<div id="map" style="height:480px;width:100%"></div>
+{{ doctors|json_script:'doctor-data' }}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function initMap() {
+    const doctors = JSON.parse(document.getElementById('doctor-data').textContent);
+    const center = doctors.length
+        ? {lat: doctors[0].latitude, lng: doctors[0].longitude}
+        : {lat: 23.0225, lng: 72.5714};
+    const map = new google.maps.Map(document.getElementById('map'), {center: center, zoom: 11});
+    const info = new google.maps.InfoWindow();
+
+    doctors.forEach(function (d) {
+        const marker = new google.maps.Marker({
+            position: {lat: d.latitude, lng: d.longitude}, map: map, title: d.name});
+        marker.addListener('click', function () {
+            const box = document.createElement('div');
+            const link = document.createElement('a');
+            link.href = '/doctor/' + d.id + '/';
+            link.textContent = d.name;
+            box.appendChild(link);
+            box.appendChild(document.createElement('br'));
+            box.appendChild(document.createTextNode(d.specialty + ', ' + d.city));
+            info.setContent(box);
+            info.open(map, marker);
+        });
+    });
+}
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key={{ maps_key }}&callback=initMap"></script>
+{% endblock %}
+Open http://127.0.0.1:8000/map/. Each marker shows a doctor; clicking it opens a small window with a link to the profile.
+
+Complete doctor/urls.py (all practical examples)
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.home, name='home'),
+    path('profile-demo/', views.profile_demo, name='profile-demo'),
+    path('register-patient/', views.register_patient, name='register-patient'),
+    path('register-user/', views.register_user, name='register-user'),
+    path('doctors/', views.doctor_list, name='doctors'),
+    path('doctors/add/', views.doctor_create, name='doctor-add'),
+    path('doctors/<int:id>/edit/', views.doctor_update, name='doctor-edit'),
+    path('doctors/<int:id>/delete/', views.doctor_delete, name='doctor-delete'),
+    path('doctor/<int:id>/', views.doctor_profile, name='profile'),
+    path('contact/', views.contact, name='contact'),
+    path('signup/', views.signup, name='signup'),
+    path('profile/', views.profile, name='my-profile'),
+    path('ajax/', views.ajax_page, name='ajax-doctors'),
+    path('ajax/list/', views.ajax_list, name='ajax-list'),
+    path('ajax/add/', views.ajax_add, name='ajax-add'),
+    path('ajax/edit/<int:id>/', views.ajax_edit, name='ajax-edit'),
+    path('ajax/delete/<int:id>/', views.ajax_delete, name='ajax-delete'),
+    path('pay/<int:id>/', views.pay_for_doctor, name='pay'),
+    path('payment/callback/', views.payment_callback, name='payment-callback'),
+    path('map/', views.doctor_map, name='doctor-map'),
+]
+
+The project doctorfinder/urls.py also includes admin/, accounts/ (Django auth, Practical Example 13), social/ (allauth, Practical Example 19), and the app's URLs. After adding any model, run python manage.py makemigrations and python manage.py migrate.

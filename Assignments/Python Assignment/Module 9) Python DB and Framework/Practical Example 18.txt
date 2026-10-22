@@ -1,0 +1,47 @@
+Practical Example 18: Deploy Doctor Finder on PythonAnywhere
+
+Step 1. Create a free account at pythonanywhere.com (your site will be YOURUSERNAME.pythonanywhere.com). Push the project to GitHub first (Practical Example 17).
+
+Step 2. Bash console on PythonAnywhere:
+
+git clone https://github.com/YOUR-USERNAME/doctor-finder.git
+cd doctor-finder
+mkvirtualenv --python=/usr/bin/python3.10 doctor-env      # use a Python version PythonAnywhere offers
+pip install -r requirements.txt
+
+Step 3. Production settings (settings.py):
+
+DEBUG = False
+ALLOWED_HOSTS = ['YOURUSERNAME.pythonanywhere.com']
+CSRF_TRUSTED_ORIGINS = ['https://YOURUSERNAME.pythonanywhere.com']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+Step 4. Database and static files:
+
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py collectstatic
+
+Step 5. Web tab: click Add a new web app, choose Manual configuration, and pick the same Python version. Then set:
+
+• Source code: /home/YOURUSERNAME/doctor-finder
+• Working directory: /home/YOURUSERNAME/doctor-finder
+• Virtualenv: /home/YOURUSERNAME/.virtualenvs/doctor-env
+• Static files: URL /static/ to directory /home/YOURUSERNAME/doctor-finder/staticfiles
+
+Step 6. WSGI file (open the link to it on the Web tab and replace its contents):
+
+import os
+import sys
+
+path = '/home/YOURUSERNAME/doctor-finder'
+if path not in sys.path:
+    sys.path.insert(0, path)
+
+os.environ['DJANGO_SETTINGS_MODULE'] = 'doctorfinder.settings'
+os.environ['DJANGO_SECRET_KEY'] = 'put-a-long-random-secret-here'
+
+from django.core.wsgi import get_wsgi_application
+application = get_wsgi_application()
+
+Step 7. Click Reload and open https://YOURUSERNAME.pythonanywhere.com. To update the site later: git pull, then pip install -r requirements.txt, python manage.py migrate, python manage.py collectstatic, and Reload.

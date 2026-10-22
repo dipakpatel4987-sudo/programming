@@ -1,0 +1,193 @@
+Practical Example 14: AJAX to add, edit, and delete doctor profiles without refreshing
+
+Views (views.py, add):
+
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
+
+@ensure_csrf_cookie                       # makes sure the csrftoken cookie is set
+def ajax_page(request):
+    return render(request, 'doctor/ajax_doctors.html')
+
+def ajax_list(request):                   # READ
+    doctors = list(Doctor.objects.order_by('-id').values(
+        'id', 'name', 'specialty', 'city', 'phone', 'email', 'fee', 'available'))
+    return JsonResponse({'doctors': doctors})
+
+@require_POST
+def ajax_add(request):                    # CREATE
+    form = DoctorForm(json.loads(request.body))
+    if form.is_valid():
+        doctor = form.save()
+        return JsonResponse({'status': 'ok', 'id': doctor.id})
+    return JsonResponse({'status': 'error', 'errors': form.errors.get_json_data()}, status=400)
+
+@require_POST
+def ajax_edit(request, id):               # UPDATE
+    doctor = get_object_or_404(Doctor, id=id)
+    form = DoctorForm(json.loads(request.body), instance=doctor)
+    if form.is_valid():
+        form.save()
+        return JsonResponse({'status': 'ok'})
+    return JsonResponse({'status': 'error', 'errors': form.errors.get_json_data()}, status=400)
+
+@require_POST
+def ajax_delete(request, id):             # DELETE
+    get_object_or_404(Doctor, id=id).delete()
+    return JsonResponse({'status': 'deleted'})
+
+URLs (doctor/urls.py, add):
+
+    path('ajax/', views.ajax_page, name='ajax-doctors'),
+    path('ajax/list/', views.ajax_list, name='ajax-list'),
+    path('ajax/add/', views.ajax_add, name='ajax-add'),
+    path('ajax/edit/<int:id>/', views.ajax_edit, name='ajax-edit'),
+    path('ajax/delete/<int:id>/', views.ajax_delete, name='ajax-delete'),
+
+Template (doctor/templates/doctor/ajax_doctors.html):
+
+{% extends 'doctor/base.html' %}
+{% load static %}
+{% block content %}
+<h1>Manage Doctors (AJAX)</h1>
+<p id="msg" style="color:#b00"></p>
+
+<div>
+    <input id="f_name" placeholder="Name">
+    <select id="f_specialty">
+        <option>Cardiology</option><option>Dermatology</option><option>Neurology</option>
+        <option>Pediatrics</option><option>Orthopedics</option><option>General</option>
+    </select>
+    <input id="f_city" placeholder="City">
+    <input id="f_phone" placeholder="Phone">
+    <input id="f_email" placeholder="Email">
+    <input id="f_fee" type="number" placeholder="Fee" value="500">
+    <label><input id="f_available" type="checkbox" checked> Available</label>
+    <button id="saveBtn" class="btn" style="margin:0">Add</button>
+    <button id="cancelBtn" class="btn" style="margin:0;background:#777">Clear</button>
+</div>
+
+<table border="1" cellpadding="6" style="margin-top:14px;width:100%">
+    <thead><tr><th>Name</th><th>Specialty</th><th>City</th><th>Phone</th><th>Fee</th><th>Actions</th></tr></thead>
+    <tbody id="rows"></tbody>
+</table>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/ajax.js' %}"></script>
+{% endblock %}
+
+JavaScript (static/js/ajax.js):
+
+function getCookie(name) {
+    const match = document.cookie.split('; ').find(row => row.startsWith(name + '='));
+    return match ? decodeURIComponent(match.split('=')[1]) : null;
+}
+const csrftoken = getCookie('csrftoken');
+let editingId = null;                         // null means "add mode"
+
+async function postJSON(url, data) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+        body: JSON.stringify(data || {}),
+    });
+    return {ok: response.ok, data: await response.json()};
+}
+
+function formValues() {
+    return {
+        name: document.getElementById('f_name').value,
+        specialty: document.getElementById('f_specialty').value,
+        city: document.getElementById('f_city').value,
+        phone: document.getElementById('f_phone').value,
+        email: document.getElementById('f_email').value,
+        fee: document.getElementById('f_fee').value,
+        available: document.getElementById('f_available').checked,
+    };
+}
+
+function resetForm() {
+    editingId = null;
+    ['f_name', 'f_city', 'f_phone', 'f_email'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f_fee').value = 500;
+    document.getElementById('f_available').checked = true;
+    document.getElementById('saveBtn').textContent = 'Add';
+}
+
+function showErrors(errors) {
+    const lines = [];
+    for (const field in errors) {
+        errors[field].forEach(e => lines.push(field + ': ' + e.message));
+    }
+    document.getElementById('msg').textContent = lines.join(' | ');
+}
+
+function addCell(row, text) {
+    const td = document.createElement('td');
+    td.textContent = text;                       // textContent prevents HTML injection
+    row.appendChild(td);
+}
+
+async function loadDoctors() {
+    const response = await fetch('/ajax/list/');
+    const data = await response.json();
+    const body = document.getElementById('rows');
+    body.innerHTML = '';
+    data.doctors.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.id = 'row-' + d.id;
+        [d.name, d.specialty, d.city, d.phone, d.fee].forEach(v => addCell(tr, v));
+
+        const actions = document.createElement('td');
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Edit';
+        editBtn.onclick = () => startEdit(d);
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Delete';
+        delBtn.onclick = () => removeDoctor(d.id);
+        actions.append(editBtn, ' ', delBtn);
+        tr.appendChild(actions);
+        body.appendChild(tr);
+    });
+}
+
+function startEdit(d) {
+    editingId = d.id;
+    document.getElementById('f_name').value = d.name;
+    document.getElementById('f_specialty').value = d.specialty;
+    document.getElementById('f_city').value = d.city;
+    document.getElementById('f_phone').value = d.phone;
+    document.getElementById('f_email').value = d.email;
+    document.getElementById('f_fee').value = d.fee;
+    document.getElementById('f_available').checked = d.available;
+    document.getElementById('saveBtn').textContent = 'Update';
+}
+
+async function saveDoctor() {
+    const url = editingId ? `/ajax/edit/${editingId}/` : '/ajax/add/';
+    const result = await postJSON(url, formValues());
+    if (result.ok) {
+        document.getElementById('msg').textContent = '';
+        resetForm();
+        loadDoctors();                            // refresh the table only, not the page
+    } else {
+        showErrors(result.data.errors);
+    }
+}
+
+async function removeDoctor(id) {
+    if (!confirm('Delete this doctor?')) return;
+    const result = await postJSON(`/ajax/delete/${id}/`);
+    if (result.ok) document.getElementById('row-' + id).remove();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDoctors();
+    document.getElementById('saveBtn').addEventListener('click', saveDoctor);
+    document.getElementById('cancelBtn').addEventListener('click', resetForm);
+});
+
+Open http://127.0.0.1:8000/ajax/. Adding, editing, and deleting update the table without a page reload.

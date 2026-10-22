@@ -1,0 +1,74 @@
+Practical Example 15: Customize the admin to show specialties and availability
+
+Availability model (models.py, add, then run makemigrations and migrate):
+
+class AvailabilitySlot(models.Model):
+    DAYS = [('Mon', 'Monday'), ('Tue', 'Tuesday'), ('Wed', 'Wednesday'),
+            ('Thu', 'Thursday'), ('Fri', 'Friday'), ('Sat', 'Saturday'), ('Sun', 'Sunday')]
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='slots')
+    day = models.CharField(max_length=3, choices=DAYS)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    def __str__(self):
+        return f'{self.doctor.name} {self.day} {self.start_time:%H:%M}-{self.end_time:%H:%M}'
+
+Admin (doctor/admin.py, complete final version):
+
+from django.contrib import admin
+from django.utils.html import format_html
+from .models import Doctor, AvailabilitySlot, ContactMessage, Profile
+
+class SlotInline(admin.TabularInline):          # edit availability on the doctor page
+    model = AvailabilitySlot
+    extra = 1
+
+@admin.register(Doctor)
+class DoctorAdmin(admin.ModelAdmin):
+    list_display = ('name', 'specialty_badge', 'city', 'phone', 'fee',
+                    'availability_summary', 'available')
+    list_filter = ('specialty', 'city', 'available')
+    search_fields = ('name', 'email', 'phone', 'specialty')
+    list_editable = ('available',)
+    list_per_page = 15
+    date_hierarchy = 'created_at'
+    readonly_fields = ('created_at',)
+    inlines = [SlotInline]
+    actions = ['mark_available', 'mark_unavailable']
+    fieldsets = (
+        ('Basic information', {'fields': ('name', 'specialty', 'bio')}),
+        ('Contact', {'fields': ('phone', 'email', 'city')}),
+        ('Location (map)', {'fields': ('latitude', 'longitude')}),
+        ('Fees and availability', {'fields': ('fee', 'available', 'created_at')}),
+    )
+
+    @admin.display(description='Specialty', ordering='specialty')
+    def specialty_badge(self, obj):
+        return format_html('<span style="background:#0b6e99;color:#fff;'
+                           'padding:2px 8px;border-radius:10px">{}</span>', obj.specialty)
+
+    @admin.display(description='Available slots')
+    def availability_summary(self, obj):
+        slots = obj.slots.all()
+        return ', '.join(f'{s.day} {s.start_time:%H:%M}-{s.end_time:%H:%M}' for s in slots) or 'No slots'
+
+    @admin.action(description='Mark selected doctors as available')
+    def mark_available(self, request, queryset):
+        count = queryset.update(available=True)
+        self.message_user(request, f'{count} doctor(s) marked available.')
+
+    @admin.action(description='Mark selected doctors as not available')
+    def mark_unavailable(self, request, queryset):
+        count = queryset.update(available=False)
+        self.message_user(request, f'{count} doctor(s) marked not available.')
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ('name', 'email', 'sent_at')
+    search_fields = ('name', 'email', 'message')
+
+admin.site.register(Profile)
+admin.site.site_header = 'Doctor Finder Admin'
+admin.site.site_title = 'Doctor Finder'
+
+In the admin, open a doctor, add availability rows in the inline table, and see the specialty badge and the slot summary in the list view.

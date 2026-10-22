@@ -1,0 +1,9 @@
+"""Practical Example: 1) Write a Python program to skip 'banana' in a list using the continue 
+statement. List1 = ['apple', 'banana', 'mango'] """
+
+List1 = ['apple', 'banana', 'mango']
+
+for item in List1:
+    if item=="banana":
+        continue    
+    print(item)

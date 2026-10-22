@@ -1,0 +1,460 @@
+Module 9) Python DB and Framework
+
+Q1.	How is HTML embedded within Python using web frameworks like Django or Flask?
+
+Answer:	Python cannot show a web page by itself; a web framework receives a browser request, runs Python code, and sends back an HTML response. HTML is kept in separate template files, and 	the framework combines it with Python data.
+	• Django: a view function renders a template: render(request, "home.html", context).
+	• Flask: a route function returns render_template("home.html", name="Asha") (Flask uses the Jinja2 template engine).
+	This keeps presentation (HTML) separate from logic (Python). Writing HTML inside Python strings is possible but hard to maintain.
+	# views.py (Django)
+	from django.shortcuts import render
+
+	def home(request):
+   		 return render(request, "home.html", {"title": "Doctor Finder"})
+
+Q2.	How is dynamic HTML content generated using Django templates?
+
+Answer: The Django Template Language (DTL) lets HTML contain placeholders replaced at run time with data from the view's context dictionary.
+	• Variables: {{ name }} prints a value; {{ doctor.name }} accesses attributes.
+	• Tags: {% for d in doctors %}...{% endfor %}, {% if %}...{% else %}...{% endif %}, {% url 'home' %}, {% csrf_token %}.
+	• Filters: {{ name|upper }}, {{ date|date:"d M Y" }}.
+	• Template inheritance: a base layout with {% block content %}{% endblock %} extended by child pages using {% extends "base.html" %}.
+	<h1>Welcome to {{ title }}</h1>
+	<ul>
+  	{% for d in doctors %}
+    	<li>{{ d.name }} - {{ d.specialty }}</li>
+  	{% empty %}
+    	<li>No doctors found</li>
+  	{% endfor %}
+	</ul>
+	Templates are stored in a templates/ folder (set in TEMPLATES['DIRS'] or inside each app) and output is auto-escaped to prevent XSS.
+
+Q3. 	How do you integrate CSS with Django templates?
+Answer: CSS files are treated as static files. Place them in a static/ folder, load Django's static tag at the top of the template, and link the file with {% static %}.
+	{% load static %}
+	<!DOCTYPE html>
+	<html>
+	<head>
+  		<link rel="stylesheet" href="{% static 'css/style.css' %}">
+	</head>
+	<body>
+  		<h1 class="title">Doctor Profile</h1>
+	</body>
+	</html>
+	Folder layout: doctor/static/css/style.css. Internal CSS inside <style> tags and inline style="" also work, but external files are better for reuse and caching.
+
+Q4. 	How do you serve static files (CSS, JavaScript, images) in Django?
+Answer: Key settings in settings.py:
+	STATIC_URL = "/static/"                          # URL prefix
+	STATICFILES_DIRS = [BASE_DIR / "static"]         # extra project-level static folders
+	STATIC_ROOT = BASE_DIR / "staticfiles"           # where collectstatic gathers files (production)
+	INSTALLED_APPS = [..., "django.contrib.staticfiles"]
+	• Development: with DEBUG = True, runserver serves static files automatically from each app's static/ folder and from STATICFILES_DIRS.
+	• Production: run python manage.py collectstatic to copy all files into STATIC_ROOT, then serve them with a web server (Nginx/Apache) or WhiteNoise.
+	• Uploaded user files are different: they use MEDIA_URL and MEDIA_ROOT.
+
+Q5. 	How is JavaScript used for client-side interactivity in Django templates?
+Answer: Django runs on the server; JavaScript runs in the browser. JavaScript in a template handles actions that need no server round-trip: validating forms, showing or hiding elements, 	updating the page on clicks, and sending AJAX requests. Django produces the HTML, and the browser then runs the script.
+	<button onclick="showMsg()">Book</button>
+	<script>
+  		function showMsg() { alert("Appointment request sent!"); }
+	</script>
+	Server values can be passed into scripts, e.g. var city = "{{ city }}"; (use {{ data|json_script:"id" }} for safe structured data).
+
+Q6. 	How do you link external or internal JavaScript files in Django?
+Answer:
+	• Internal: write JavaScript inside <script> ... </script> in the template.
+	• External: save it as static/js/app.js and include it with the static tag, usually just before </body>:
+	{% load static %}
+	<script src="{% static 'js/app.js' %}"></script>
+	External files are cacheable and reusable. Libraries from a CDN (jQuery, Bootstrap) are linked with a normal src="https://..." URL. A template can define {% block scripts %}{% 	endblock %} in the base layout so each page adds its own scripts.
+
+Q7. 	What is Django?
+Answer: Django is a free, open-source, high-level Python web framework that encourages rapid development and clean design. It follows the "batteries included" philosophy: it ships with an 	ORM, admin panel, authentication, form handling, template engine, URL routing, and security features. It uses the MVT (Model-View-Template) architecture and the DRY principle. It 	was created at a newspaper (Lawrence Journal-World) and released publicly in 2005, and is used by sites such as Instagram and Pinterest.
+
+Q8. 	What are the advantages of Django (scalability, security, etc.)?
+Answer:
+	1. Rapid development: built-in components reduce the code you write.
+	2. Security: protects against SQL injection, XSS, CSRF, and clickjacking by default; secure password hashing.
+	3. Scalability: supports caching, load balancing, and a "shared-nothing" design; handles high-traffic sites.
+	4. Built-in admin panel for managing data.
+	5. ORM: work with databases using Python instead of raw SQL; supports SQLite, MySQL, PostgreSQL, Oracle.
+	6. Versatile: suits CMSs, e-commerce, social networks, and APIs (with Django REST Framework).
+	7. Good documentation and large community, plus many reusable packages.
+	8. Clean, maintainable structure (projects and apps, MVT).
+
+Q9. 	How do Django and Flask compare, and which should you choose?
+Answer:-------------------------------------------------------------------------------------------------------------------------
+	Feature				Django					Flask
+	-------------------------------------------------------------------------------------------------------------------------
+	Type				Full-stack framework			Micro-framework
+	Philosophy			Batteries included			Minimal core; add what you need
+	ORM / Admin / Auth		Built in				Via extensions (SQLAlchemy, Flask-Login)
+	Structure			Enforced project layout			Flexible, your own structure
+	Learning curve			Steeper at first			Easier to start
+	Best for			Large, database-driven apps		Small apps, APIs, prototypes, microservices
+	Template engine			Django Template Language		Jinja2
+
+	Choose Django for feature-rich applications that need an admin, authentication, and a database quickly (such as Doctor Finder). Choose Flask for small services or when you want 	full control over components.
+
+Q10. 	Why is a virtual environment important in Python projects?
+Answer: A virtual environment is an isolated folder containing its own Python interpreter and installed packages. Importance:
+	1. Dependency isolation: different projects can use different versions of the same package (e.g., Django 3 vs 5) without conflict.
+	2. Keeps the global Python clean.
+	3. Reproducibility: pip freeze > requirements.txt records exact versions so others can recreate the setup.
+	4. Easier deployment and teamwork.
+	5. No admin rights needed to install packages.
+
+Q11. 	How do you use venv or virtualenv to create isolated environments?
+Answer:
+	# Create (venv is built into Python 3)
+	python -m venv env
+
+	# Activate
+	env\Scripts\activate            # Windows
+	source env/bin/activate         # Linux / macOS
+
+	# Install packages inside it
+	pip install django
+	pip freeze > requirements.txt
+
+	# Recreate elsewhere
+	pip install -r requirements.txt
+
+	# Leave the environment
+	deactivate
+	The prompt shows (env) when active. virtualenv is a third-party tool (pip install virtualenv, then virtualenv env) with similar usage and extra features. Do not commit the env/ 	folder to Git; add it to .gitignore.
+
+Q12. 	What are the steps to create a Django project and individual apps?
+Answer:
+	python -m venv env && env\Scripts\activate     # 1. create and activate environment
+	pip install django                             # 2. install Django
+	django-admin startproject doctorfinder         # 3. create the project
+	cd doctorfinder
+	python manage.py startapp doctor               # 4. create an app
+	# 5. register the app in settings.py -> INSTALLED_APPS = [..., "doctor"]
+	python manage.py migrate                       # 6. create initial tables
+	python manage.py runserver                     # 7. start the server at http://127.0.0.1:8000/
+	A project is the whole website (settings and configuration); an app is a self-contained module with one feature (doctors, appointments, users). One project can contain many apps, 	and an app can be reused in other projects. An app contains models.py, views.py, admin.py, apps.py, tests.py, and migrations/.
+
+Q13. 	What are the roles of manage.py, urls.py, and views.py?
+Answer:
+	• manage.py: a command-line utility to run administrative tasks: runserver, makemigrations, migrate, startapp, createsuperuser, shell, collectstatic, test.
+	• urls.py: the URL router. It maps URL patterns to views. The project's urls.py is the entry point and usually includes each app's own urls.py.
+	• views.py: contains view functions or classes that receive the request, fetch data (from models), and return a response (rendered HTML, JSON, or a redirect).
+	# urls.py
+	from django.urls import path
+	from . import views
+	urlpatterns = [path("", views.home, name="home")]
+	Other important files: settings.py (configuration), models.py (database structure), wsgi.py/asgi.py (server entry points).
+
+Q14. 	Explain Django's MVT (Model-View-Template) architecture and how it handles request-response cycles.
+Answer: MVT divides an application into three parts:
+	• Model: the data layer. Python classes in models.py that map to database tables; the ORM handles queries.
+	• View: the logic layer. A function or class that processes the request, talks to models, and chooses a template. (Django's "view" is like the controller in MVC.)
+	• Template: the presentation layer. HTML with Django template tags.
+	The framework itself acts as the controller by routing URLs.
+	Request-response cycle:
+	1. The browser sends an HTTP request (e.g., /doctors/).
+	2. The request passes through middleware (security, sessions, authentication).
+	3. The URL dispatcher (urls.py) matches the URL to a view.
+	4. The view runs; it queries the model (database) if needed.
+	5. The view passes data to a template, which is rendered into HTML.
+	6. The response goes back through middleware to the browser.
+	# models.py
+	class Doctor(models.Model):
+    		name = models.CharField(max_length=100)
+	# views.py
+	def doctor_list(request):
+    		return render(request, "list.html", {"doctors": Doctor.objects.all()})
+
+Q15. 	What is Django's built-in admin panel?
+Answer: The admin is an automatically generated, ready-to-use web interface (at /admin/) for managing the site's data. It reads your models and provides pages to add, view, edit, delete, 	search, and filter records, plus user and permission management. It is included by django.contrib.admin.
+	python manage.py migrate
+	python manage.py createsuperuser     # create an admin account
+	# admin.py
+	from django.contrib import admin
+	from .models import Doctor
+	admin.site.register(Doctor)          # make the model editable in admin
+	It is meant for trusted staff and site managers, not for end users.
+
+Q16. 	How do you customize the Django admin interface to manage database records?
+Answer: Use a ModelAdmin class:
+	@admin.register(Doctor)
+	class DoctorAdmin(admin.ModelAdmin):
+    		list_display = ("name", "specialty", "city", "available")   # columns in the list
+    		list_filter = ("specialty", "city")                          # right-side filters
+    		search_fields = ("name", "specialty")                        # search box
+    		list_editable = ("available",)                               # edit in the list
+    		ordering = ("name",)
+    		list_per_page = 20
+    		fieldsets = (("Basic", {"fields": ("name", "specialty")}),
+                 		("Contact", {"fields": ("phone", "email")}))
+    		readonly_fields = ("created_at",)
+	Other options: inlines (edit related records on the same page), custom actions, date_hierarchy, prepopulated_fields, and changing the site titles (admin.site.site_header = "Doctor 	Finder Admin").
+
+
+Q17. 	How do you set up URL patterns in urls.py for routing requests to views?
+Answer: urlpatterns is a list of path() (or re_path()) entries that map a URL to a view. The project urls.py includes app URLs with include().
+	# project/urls.py
+	from django.urls import path, include
+	urlpatterns = [
+    		path("admin/", admin.site.urls),
+    		path("", include("doctor.urls")),
+	]
+
+	# doctor/urls.py
+	urlpatterns = [
+    		path("", views.home, name="home"),
+    		path("doctors/", views.doctor_list, name="doctors"),
+    		path("doctor/<int:id>/", views.profile, name="profile"),   # URL parameter
+    		path("contact/", views.contact, name="contact"),
+	]
+
+	Path converters: <int:id>, <str:name>, <slug:slug>. Named URLs let templates link without hard-coding: <a href="{% url 'profile' d.id %}">. Django checks patterns from top to 	bottom and uses the first match.
+
+Q18.	How do you integrate templates with views to render dynamic HTML content?
+Answer: The view fetches data and calls render(request, template_name, context). The template displays the context values.
+	# views.py
+	def profile(request, id):
+    		doctor = get_object_or_404(Doctor, id=id)
+    		return render(request, "doctor/profile.html", {"doctor": doctor})
+
+	<!-- templates/doctor/profile.html -->
+	{% extends "base.html" %}
+	{% block content %}
+  	<h2>{{ doctor.name }}</h2>
+  	<p>{{ doctor.specialty }}</p>
+  	<a href="{% url 'home' %}">Back</a>
+	{% endblock %}
+	Templates are found in each app's templates/ folder (with APP_DIRS = True) or in directories listed in TEMPLATES['DIRS']. Using base templates and {% extends %} keeps navigation 	and styles consistent across pages.
+
+Q19. 	How is JavaScript used for front-end form validation?
+Answer: Client-side validation checks form input in the browser before it is submitted, giving instant feedback and reducing server load. JavaScript reads field values, tests them (empty 	fields, email format, phone length, password match, using regular expressions), shows error messages, and blocks submission with event.preventDefault() or by returning false.
+	<form id="reg" method="post">
+  		{% csrf_token %}
+  		<input type="text" id="email" name="email">
+  		<input type="text" id="phone" name="phone">
+  		<span id="err" style="color:red"></span>
+  		<button type="submit">Register</button>
+	</form>
+	<script>
+  		document.getElementById("reg").addEventListener("submit", function (e) {
+    		const email = document.getElementById("email").value;
+    		const phone = document.getElementById("phone").value;
+    		const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    		const phoneOk = /^\d{10}$/.test(phone);
+    		if (!emailOk || !phoneOk) {
+      			e.preventDefault();
+      			document.getElementById("err").textContent = "Enter a valid email and 10-digit phone";
+    			}
+  		});
+	</script>
+	Important: client-side validation can be bypassed, so the server must validate again (Django forms or serializers). HTML5 attributes (required, type="email", pattern) also 		provide basic validation.
+
+Q20. 	How do you connect Django to a database (SQLite or MySQL)?
+Answer: Database settings are in the DATABASES dictionary of settings.py.
+	SQLite (default; no setup, file based):
+	DATABASES = {
+    		"default": {
+        		"ENGINE": "django.db.backends.sqlite3",
+        		"NAME": BASE_DIR / "db.sqlite3",
+    		}
+	}
+	MySQL: install the driver (pip install mysqlclient or pymysql), create the database in MySQL first, then:
+	DATABASES = {
+    		"default": {
+        		"ENGINE": "django.db.backends.mysql",
+        		"NAME": "doctor_db",
+        		"USER": "root",
+        		"PASSWORD": "secret",
+        		"HOST": "localhost",
+        		"PORT": "3306",
+    		}
+	}
+	Then run python manage.py makemigrations and python manage.py migrate to create tables. Keep passwords out of source control by using environment variables. PostgreSQL and Oracle 	are also supported.
+
+Q21. 	How is the Django ORM used for database queries?
+Answer: The ORM (Object-Relational Mapper) lets you work with database tables as Python classes and rows as objects, with no hand-written SQL. A model class defines a table; each attribute 	is a column.
+
+	class Doctor(models.Model):
+    		name = models.CharField(max_length=100)
+    		specialty = models.CharField(max_length=50)
+    		fee = models.DecimalField(max_digits=8, decimal_places=2)
+
+	Workflow: define models → makemigrations (creates a migration file) → migrate (applies it). Queries go through the model's manager: Doctor.objects.all(), .filter(), .get(). 	Benefits: database independence, security against SQL injection, and shorter code. Raw SQL is still available via Doctor.objects.raw(...).
+
+Q22. 	What is Django's ORM, and how are QuerySets used to interact with the database?
+Answer: A QuerySet is a collection of database objects returned by the ORM. It is lazy: the SQL runs only when the results are actually used (iterated, sliced, printed, list(), len()). 	QuerySets can be chained and are cached after evaluation.
+	# Create
+	d = Doctor.objects.create(name="Dr. Shah", specialty="Cardiology", fee=500)
+	# or: d = Doctor(name="..."); d.save()
+
+	# Read
+	Doctor.objects.all()                              # every row
+	Doctor.objects.get(id=1)                          # exactly one (error if none/many)
+	Doctor.objects.filter(specialty="Cardiology")     # matching rows
+	Doctor.objects.exclude(fee__gt=1000)              # exclude matches
+	Doctor.objects.filter(name__icontains="sh").order_by("-fee")[:5]
+	Doctor.objects.count()
+
+	# Update
+	Doctor.objects.filter(id=1).update(fee=600)       # or: d.fee = 600; d.save()
+
+	# Delete
+	Doctor.objects.get(id=1).delete()
+	Field lookups use double underscores: __gt, __lt, __gte, __contains, __in, __startswith. Combine conditions with Q objects (Q(a) | Q(b)). Use select_related() and 	prefetch_related() to avoid extra queries, and aggregate()/annotate() for totals and averages. This covers CRUD (Create, Read, Update, Delete).
+
+Q23. 	How does Django's built-in form handling work?
+Answer: Django's forms system defines fields in Python, renders them as HTML, validates submitted data, and gives clean Python values. A ModelForm builds a form directly from a model.
+	# forms.py
+	from django import forms
+	from .models import Doctor
+
+	class DoctorForm(forms.ModelForm):
+    		class Meta:
+        		model = Doctor
+        		fields = ["name", "specialty", "fee"]
+
+	# views.py
+	def add_doctor(request):
+    		form = DoctorForm(request.POST or None)
+    		if request.method == "POST" and form.is_valid():
+        		form.save()
+        		return redirect("doctors")
+    		return render(request, "add.html", {"form": form})
+
+	<form method="post">{% csrf_token %}{{ form.as_p }}<button>Save</button></form>
+	Benefits: automatic validation and error messages, built-in CSRF protection ({% csrf_token %}), and reuse. Custom validation uses clean_<field>() methods.
+
+Q24. 	How is Django's authentication system implemented (sign up, login, logout, password management)?
+Answer: django.contrib.auth provides the User model, password hashing, sessions, and permissions.
+	• Sign up: UserCreationForm creates a user.
+	• Login/Logout: authenticate() verifies credentials, login(request, user) starts a session, logout(request) ends it. Or use the built-in views via path("accounts/", 	include("django.contrib.auth.urls")) (login, logout, password change, password reset).
+	• Access control: @login_required on views; request.user.is_authenticated in code and templates.
+	• Password management: passwords are stored hashed (PBKDF2 by default); PasswordChangeView, and password reset by email (PasswordResetView, which needs email settings).
+	• Profile updates: extend the user with a OneToOneField profile model or a custom user model.
+
+	from django.contrib.auth import authenticate, login
+
+	def user_login(request):
+    		if request.method == "POST":
+        		user = authenticate(request, username=request.POST["username"],
+                            	password=request.POST["password"])
+        		if user:
+            			login(request, user)
+            			return redirect("home")
+    		return render(request, "login.html")
+	Set LOGIN_URL, LOGIN_REDIRECT_URL, and LOGOUT_REDIRECT_URL in settings.
+
+Q25. 	How is AJAX used to make asynchronous requests without reloading the page?
+Answer: AJAX (Asynchronous JavaScript and XML) lets JavaScript send requests to the server in the background and update part of the page with the response, with no full page reload. Data 	is usually exchanged as JSON. Tools: the built-in fetch() API, XMLHttpRequest, or jQuery's $.ajax().
+	Flow: an event (click or submit) → JavaScript sends an HTTP request → a Django view processes it and returns JsonResponse → JavaScript updates the DOM.
+	# views.py
+	from django.http import JsonResponse
+	def delete_doctor(request, id):
+    		Doctor.objects.filter(id=id).delete()
+    		return JsonResponse({"status": "deleted"})
+
+	fetch(`/delete/${id}/`, {
+  	method: "POST",
+  	headers: {"X-CSRFToken": csrftoken}      // Django requires the CSRF token for POST
+	})
+	.then(r => r.json())
+	.then(data => document.getElementById(`row-${id}`).remove());
+	AJAX can perform all CRUD actions: POST to create, GET to read, POST/PUT to update, and DELETE/POST to delete. Benefits: faster, smoother user experience and less bandwidth.
+
+Q26. 	What techniques are used to customize the Django admin panel?
+Answer:
+	1. list_display: choose columns; can include custom methods.
+	2. list_filter, search_fields, ordering, date_hierarchy: easier navigation.
+	3. list_editable: edit fields directly in the list.
+	4. fieldsets / fields / readonly_fields: organize and protect the edit form.
+	5. Inlines (TabularInline, StackedInline): edit related models on one page (e.g., a doctor's time slots).
+	6. Custom actions: bulk operations such as "mark as available".
+	7. Custom display methods with @admin.display for computed columns.
+	8. Branding: admin.site.site_header, site_title, index_title.
+	9. Overriding templates and adding CSS (templates/admin/, class Media).
+	10. Permissions: restrict via has_add_permission() etc.
+	@admin.register(Doctor)
+	class DoctorAdmin(admin.ModelAdmin):
+    		list_display = ("name", "specialty", "availability_status")
+    		actions = ["mark_available"]
+
+    	@admin.display(description="Status")
+    	def availability_status(self, obj):
+        	return "Available" if obj.available else "Busy"
+
+    	@admin.action(description="Mark selected as available")
+    	def mark_available(self, request, queryset):
+        	queryset.update(available=True)
+
+Q27. 	How are payment gateways like Paytm integrated into Django projects?
+Answer: A payment gateway securely collects card, UPI, and wallet payments so your site never handles raw card data. Typical Paytm flow (check Paytm's current developer documentation, 	since details and SDKs change):
+	1. Register as a merchant and get the Merchant ID (MID) and Merchant Key (test credentials first); store them in settings or environment variables, never in public code.
+	2. Create an order: when the user clicks Pay, the server builds a transaction request (order ID, amount, customer ID, callback URL).
+	3. Generate a checksum/signature with Paytm's library, so data cannot be tampered with.
+	4. Redirect the user to Paytm's payment page (or open its checkout), where they pay.
+	5. Callback: Paytm sends the result (success/failure, transaction ID) to your callback URL, a Django view that must be CSRF-exempt.
+	6. Verify the checksum and, ideally, the transaction status through Paytm's status API before marking an order paid.
+	7. Save the payment record in the database and show a confirmation page.
+	Good practice: never trust client-side data, always verify on the server, use HTTPS, test in the sandbox before going live, and keep secret keys private.
+
+Q28. 	What are the steps to push a Django project to GitHub?
+Answer:
+	1. Install Git and set your identity: git config --global user.name "Name" and git config --global user.email "you@example.com".
+	2. Create a GitHub repository (empty) on github.com.
+	3. In the project folder, initialize Git: git init.
+	4. Create .gitignore to exclude env/, __pycache__/, db.sqlite3, .env, and *.pyc.
+	5. Create requirements.txt: pip freeze > requirements.txt.
+	6. Stage and commit: git add . then git commit -m "Initial commit".
+	7. Rename branch (optional): git branch -M main.
+	8. Link the remote: git remote add origin https://github.com/username/doctor-finder.git.
+	9. Push: git push -u origin main (authenticate with a personal access token or SSH key, since GitHub no longer accepts account passwords for Git operations).
+	10. Later changes: git add . → git commit -m "message" → git push.
+	Never push secrets (SECRET_KEY, API keys, passwords); use environment variables.
+
+Q29. 	How are Django projects deployed to live servers like PythonAnywhere?
+Answer: PythonAnywhere is a cloud hosting service for Python web apps with a free beginner tier. Typical steps:
+	1. Create an account (username gives the domain username.pythonanywhere.com).
+	2. Upload the code: open a Bash console and run git clone https://github.com/username/repo.git (or upload files).
+	3. Create a virtual environment: mkvirtualenv --python=/usr/bin/python3.x myenv, then pip install -r requirements.txt.
+	4. Create a web app: Web tab → "Add a new web app" → Manual configuration → select the Python version.
+	5. Configure: set the source code path and virtualenv path; edit the WSGI configuration file to point to your project's settings module.
+	6. Edit settings.py: DEBUG = False; add the domain to ALLOWED_HOSTS = ["username.pythonanywhere.com"].
+	7. Static files: set STATIC_ROOT, run python manage.py collectstatic, and map the URL /static/ to that folder in the Web tab.
+	8. Database: run python manage.py migrate (and createsuperuser).
+	9. Click Reload and open the site's URL.
+	To update later: git pull, install new packages, migrate, collectstatic, and reload.
+
+Q30. 	How do you set up social login (Google, Facebook, GitHub) in Django using OAuth2?
+Answer: OAuth2 lets a user sign in with an existing account on another provider without sharing their password; the provider returns an access token and profile data. Popular Django 	packages: django-allauth and social-auth-app-django.
+	Steps (django-allauth):
+	1. pip install django-allauth.
+	2. In settings.py add to INSTALLED_APPS: django.contrib.sites, allauth, allauth.account, allauth.socialaccount, and providers such as allauth.socialaccount.providers.google; add 	SITE_ID = 1, the allauth authentication backend, and its middleware (as required by your version).
+	3. Add path("accounts/", include("allauth.urls")) to urls.py, and run migrate.
+	4. Register the app with the provider (Google Cloud Console, Meta for Developers, GitHub Developer Settings) to get a Client ID and Client Secret, and set the redirect (callback) 	URI, e.g. http://127.0.0.1:8000/accounts/google/login/callback/.
+	5. Add the credentials in the Django admin under Social applications (or in settings).
+	6. Add a login link in a template: <a href="{% url 'google_login' %}">Login with Google</a>.
+	Flow: the user clicks → is redirected to the provider → grants permission → provider redirects back with a code → Django exchanges it for a token → a local user is created or 	logged in. Keep client secrets private.
+
+Q31. 	How is the Google Maps API integrated into Django projects?
+Answer: The Google Maps JavaScript API displays interactive maps in the browser; related APIs include Geocoding (address to coordinates) and Places.
+	Steps:
+	1. Create a project in Google Cloud Console, enable the Maps JavaScript API, enable billing (a free monthly credit applies), and create an API key; restrict it by HTTP referrer and 	API.
+	2. Store the key in settings or an environment variable and pass it to the template.
+	3. Store each doctor's latitude and longitude in the model (FloatField).
+	4. Load the map in the template and add markers.
+	<div id="map" style="height:400px"></div>
+	<script>
+  		function initMap() {
+    		const map = new google.maps.Map(document.getElementById("map"),
+                                    {center: {lat: 23.02, lng: 72.57}, zoom: 11});
+    		{% for d in doctors %}
+      		new google.maps.Marker({position: {lat: {{ d.lat }}, lng: {{ d.lng }}},
+                              map: map, title: "{{ d.name }}"});
+    	{% endfor %}
+  	}
+	</script>
+	<script async src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&callback=initMap"></script>
+	The view supplies doctors and api_key in the context. Never expose an unrestricted key.

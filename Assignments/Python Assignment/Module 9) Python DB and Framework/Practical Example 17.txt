@@ -1,0 +1,37 @@
+Practical Example 17: Step-by-step guide to deploy Doctor Finder to GitHub
+
+Step 1. Keep secrets out of the code (settings.py):
+import os
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-only-key-change-me')
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+Step 2. Create .gitignore in the project root:
+env/
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+.env
+staticfiles/
+media/
+.vscode/
+.idea/
+Step 3. Create a GitHub repository: on github.com choose New repository, name it doctor-finder, leave it empty (no README), and copy its URL.
+Step 4. Commands (run in the folder containing manage.py):
+git --version
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+
+pip freeze > requirements.txt
+git init
+git add .
+git status
+git commit -m "Initial commit: Doctor Finder project"
+git branch -M main
+git remote add origin https://github.com/YOUR-USERNAME/doctor-finder.git
+git push -u origin main
+When asked to sign in, use a personal access token (GitHub Settings, Developer settings) instead of your password, or set up an SSH key.
+Step 5. Later changes:
+git add .
+git commit -m "Describe the change"
+git push
+Optional: add a README.md describing the project, its features, and the setup commands (pip install -r requirements.txt, python manage.py migrate, python manage.py runserver).

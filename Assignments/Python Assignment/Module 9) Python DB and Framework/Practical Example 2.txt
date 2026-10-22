@@ -1,0 +1,63 @@
+Practical Example 2: Webpage with custom CSS (doctor profile page)
+
+
+Files: settings.py, static/css/style.css, doctor/templates/doctor/profile_static.html, views.py, urls.py
+
+
+# settings.py  (add at the bottom)
+STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+
+
+/* static/css/style.css */
+body { font-family: Arial, sans-serif; background: #f2f7fb; margin: 0; }
+.card { max-width: 420px; margin: 40px auto; background: #fff; padding: 24px;
+        border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.15); text-align: center; }
+.card h2 { color: #0b6e99; margin-bottom: 4px; }
+.specialty { color: #555; font-style: italic; }
+.badge { display: inline-block; padding: 4px 12px; border-radius: 20px;
+         color: #fff; font-size: 14px; }
+.badge.yes { background: #28a745; }
+.badge.no  { background: #dc3545; }
+.btn { display: inline-block; margin-top: 16px; padding: 10px 22px; background: #0b6e99;
+       color: #fff; text-decoration: none; border-radius: 6px; border: 0; cursor: pointer; }
+.btn:hover { background: #084f6f; }
+
+
+# doctor/views.py  (add)
+def profile_demo(request):
+    doctor = {'name': 'Dr. Asha Shah', 'specialty': 'Cardiologist',
+              'city': 'Ahmedabad', 'phone': '9876543210',
+              'fee': 500, 'available': True}
+    return render(request, 'doctor/profile_static.html', {'doctor': doctor})
+
+
+# doctor/urls.py  (add inside urlpatterns)
+    path('profile-demo/', views.profile_demo, name='profile-demo'),
+
+
+<!-- doctor/templates/doctor/profile_static.html -->
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ doctor.name }}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="card">
+        <h2>{{ doctor.name }}</h2>
+        <p class="specialty">{{ doctor.specialty }}</p>
+        <p>City: {{ doctor.city }}</p>
+        <p>Phone: {{ doctor.phone }}</p>
+        <p>Fee: Rs. {{ doctor.fee }}</p>
+        {% if doctor.available %}
+            <span class="badge yes">Available</span>
+        {% else %}
+            <span class="badge no">Not available</span>
+        {% endif %}
+        <br><a class="btn" href="#">Book Appointment</a>
+    </div>
+</body>
+</html>
+Open http://127.0.0.1:8000/profile-demo/.
